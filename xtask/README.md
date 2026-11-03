@@ -3,7 +3,7 @@
 `cargo xtask --help` lists the app's native development tasks.
 
 Ticket #70 uses `craft-xtask` from `cloudbring/craft-libs`'s `algo/integration`
-branch, locked to `fc32458`. It remains an xtask-only dependency, not an app
+branch, locked to `3c4d2f7`. It remains an xtask-only dependency, not an app
 runtime dependency. The dependency must be repointed after the upstream merge.
 
 ## Shared tasks
@@ -16,36 +16,28 @@ runtime dependency. The dependency must be repointed after the upstream merge.
 - **ico:** caller-relative positional paths and arbitrary ordered square PNG
   sizes from 1 through 256, exactly as before. LightCraft had no ICNS command;
   none is added by this migration.
-- **layers:** `src/task_policy.rs` holds the original table, intra-layer edges,
-  UI restrictions, metadata interpretation and report formatting. Checking is
-  delegated to `craft_xtask::layers::check`. CI and WASM keep their existing
-  imports and behavior.
+- **layers:** `src/task_policy.rs` holds the original table, intra-layer edges
+  and UI restrictions, then formats `craft_xtask::layers::Report` from
+  `layers::compute` / `layers::check_graph`.
 - **SHA-256:** corpus checksums use `craft_xtask::sha256_hex`; xtask no longer
   depends on sha2 directly.
 
 ## Shared API limitations
 
-This is not a complete conversion to `run(&Config, &args)` for all five tasks.
-At `fc32458`, shared `layers::run` only prints `layers: ok`; no configuration
-retains LightCraft's dependency table. The local presentation adapter therefore
-uses the shared checker instead. Its unregistered-crate diagnostic points at
-the new policy filename.
+Shared `layers::render` only prints `layers: ok` on success; `src/task_policy.rs`
+therefore formats the table and legacy diagnostics over `layers::Report`.
 
-**Parity stays local and unchanged.** Shared parity implements a different
-weighted checklist format, not LightCraft's command/control/path evidence and
-gap validation. Its `command` hook treats stdout as the entire replacement
-checklist, writes by default, and does not support LightCraft's `--write`
-semantics. Wiring that hook would silently change the task. The shared
-`SURVEY.md` explicitly identifies LightCraft parity as app-owned. A compatible
-shared API is needed before deleting this implementation.
+**Parity stays local and unchanged.** Shared `parity::compute` implements the
+4-column `D/P/M` weighted checklist format, not LightCraft's 6-column `✅/🟡/⬜/🚫`
+section summary, `--write` flag, or command/control/path/gap evidence validation.
+The shared `SURVEY.md` explicitly identifies LightCraft parity as app-owned.
 
 Assets, bench, ci/ci_lock/ci_quick/ci_report, corpus downloading, raw_samples,
 wasm and web remain local. No application or CI workflow changes are included.
 
 Successful report/edited-file goldens are byte-exact. Shared version adds `tag`
 and no longer echoes lockfile-update subprocess commands to stderr. Shared I/O
-errors and icon usage/validation diagnostics can differ. These shared API
-differences are not disguised as exact compatibility for all inputs.
+errors and icon usage/validation diagnostics can differ.
 
 ## Scoped verification
 

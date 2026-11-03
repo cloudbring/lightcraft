@@ -1,9 +1,9 @@
-use super::{cargo, layers, metadata, run};
+use super::{cargo, layers, run};
 
 /// Workspace packages that must build for wasm32: all L0–L5 crates plus
 /// the egui shell and the web app.
 fn wasm_set() -> Result<Vec<String>, String> {
-    let crates = layers::from_metadata(&metadata()?)?;
+    let crates = craft_xtask::layers::compute(&layers::config(), &craft_xtask::layers::Args::default())?.crates;
     Ok(crates
         .into_iter()
         .filter(|c| match layers::classify(&c.name) {

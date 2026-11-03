@@ -1,9 +1,8 @@
-//! LightCraft layer policy and legacy report formatting over the shared checker.
+//! LightCraft layer policy and legacy report formatting over `craft_xtask::layers::Report`.
 
-use super::metadata;
-use craft_xtask::layers::{Config, ExternalRule};
-pub use craft_xtask::layers::{Crate, Dep, DepKind};
-use serde_json::Value;
+use craft_xtask::layers::{Args, Config, DepKind, ExternalRule, Report, Violation, compute};
+#[cfg(test)]
+pub use craft_xtask::layers::{Crate, Dep};
 use std::fmt::Write;
 
 /// Where a workspace crate sits.
@@ -83,29 +82,6 @@ pub fn classify(pkg: &str) -> Option<Class> {
     TABLE.iter().find(|(n, _)| *n == s).map(|(_, c)| *c)
 }
 
-pub fn from_metadata(meta: &Value) -> Result<Vec<Crate>, String> {
-    let pkgs = meta["packages"].as_array().ok_or("metadata: no packages array")?;
-    let members: Vec<&str> = pkgs.iter().filter_map(|p| p["name"].as_str()).collect();
-    let mut out = Vec::new();
-    for p in pkgs {
-        let name = p["name"].as_str().ok_or("package without name")?.to_owned();
-        let mut deps = Vec::new();
-        for d in p["dependencies"].as_array().into_iter().flatten() {
-            let dname = d["name"].as_str().unwrap_or_default().to_owned();
-            let kind = match d["kind"].as_str() {
-                Some("dev") => DepKind::Dev,
-                Some("build") => DepKind::Build,
-                _ => DepKind::Normal,
-            };
-            let workspace = members.contains(&dname.as_str()) || d["path"].is_string();
-            deps.push(Dep { name: dname, kind, workspace });
-        }
-        out.push(Crate { name, deps });
-    }
-    out.sort_by(|a, b| a.name.cmp(&b.name));
-    Ok(out)
-}
-
 pub fn describe(class: Option<Class>) -> String {
     match class {
         Some(Class::Layer(l)) => format!("L{l}"),
@@ -118,79 +94,69 @@ pub fn describe(class: Option<Class>) -> String {
 
 pub fn config() -> Config {
     let full = |name: &str| if matches!(name, "lightcraft" | "xtask") { name.to_owned() } else { format!("lightcraft-{name}") };
-    let mut config = Config { root: crate::root(), ..Config::default() };
-    config.standalone = TABLE.iter().filter(|(_, class)| *class == Class::Standalone).map(|(name, _)| full(name)).collect();
-    for layer in 0..=5 {
-        let names = TABLE
-            .iter()
-            .filter(|(_, class)| match class {
-                Class::Layer(value) => *value == layer,
-                Class::Standalone => layer == 0,
-                Class::Testkit => layer == 5,
-                Class::Exempt => false,
+    let pick = |target| TABLE.iter().filter(|(_, c)| *c == target).map(|(n, _)| full(n)).collect();
+    Config {
+        root: crate::root(),
+        layers: (0..=5)
+            .map(|l| {
+                let names = TABLE
+                    .iter()
+                    .filter(|(_, c)| {
+                        matches!(c, Class::Layer(v) if *v == l) || (*c == Class::Standalone && l == 0) || (*c == Class::Testkit && l == 5)
+                    })
+                    .map(|(n, _)| full(n))
+                    .collect();
+                (format!("L{l}"), names)
             })
-            .map(|(name, _)| full(name))
-            .collect();
-        config.layers.push((format!("L{layer}"), names));
+            .collect(),
+        exempt: pick(Class::Exempt),
+        standalone: pick(Class::Standalone),
+        testkits: pick(Class::Testkit),
+        allowed_edges: INTRA_LAYER_ORDER
+            .iter()
+            .flat_map(|chain| chain.iter().enumerate().flat_map(|(i, from)| chain[..i].iter().map(move |to| (full(from), full(to)))))
+            .collect(),
+        external_rules: vec![ExternalRule {
+            dependencies: ["craft-ui", "egui", "eframe", "winit", "egui_kittest", "rfd", "bevy*"].map(str::to_owned).to_vec(),
+            allowed_from: vec!["lightcraft-ui-egui".into(), "lightcraft-mcp".into(), "lightcraft-testkit".into()],
+            allowed_dev_from: vec![],
+        }],
+        ..Config::default()
     }
-    for (name, class) in TABLE {
-        match class {
-            Class::Exempt => config.exempt.push(full(name)),
-            Class::Standalone => {}
-            Class::Testkit => config.testkits.push(full(name)),
-            Class::Layer(_) => {}
-        }
-    }
-    for chain in INTRA_LAYER_ORDER {
-        for (index, from) in chain.iter().enumerate() {
-            for to in chain.iter().take(index) {
-                config.allowed_edges.push((full(from), full(to)));
-            }
-        }
-    }
-    config.external_rules.push(ExternalRule {
-        dependencies: ["craft-ui", "egui", "eframe", "winit", "egui_kittest", "rfd", "bevy*"].map(str::to_owned).to_vec(),
-        allowed_from: vec!["lightcraft-ui-egui".into(), "lightcraft-mcp".into(), "lightcraft-testkit".into()],
-        allowed_dev_from: vec![],
-    });
-    config
 }
 
-fn diagnostic(message: String) -> Option<String> {
-    if let Some(name) = message.strip_suffix(": unregistered workspace crate") {
-        return Some(format!("{name}: unknown workspace crate; register it in xtask/src/task_policy.rs TABLE (see plan/architecture.md §3)"));
-    }
-    let Some((source, rest)) = message.split_once(" -> ") else { return Some(message) };
-    let Some((target, rule)) = rest.split_once(": ") else { return Some(message) };
-    let (target, kind) = target.split_once(" [").map_or((target, ""), |(target, kind)| (target, kind.trim_end_matches(']')));
+fn diagnostic(v: &Violation) -> Option<String> {
     let level = |name| match classify(name) {
         Some(Class::Layer(value)) => value,
         Some(Class::Standalone) => 0,
         Some(Class::Testkit) => 5,
         _ => 7,
     };
-    Some(match rule {
-        "testkit is dev-only" => format!("{source}: lightcraft-testkit may only be a dev-dependency"),
-        "standalone dependency" => format!("{source}: standalone crate must not depend on workspace crate {target}"),
+    let kind = v.kind.map(|k| format!("{k:?}")).unwrap_or_default();
+    Some(match v.rule.as_str() {
+        "unregistered workspace crate" => {
+            format!("{}: unknown workspace crate; register it in xtask/src/task_policy.rs TABLE (see plan/architecture.md §3)", v.from)
+        }
+        "testkit is dev-only" => format!("{}: lightcraft-testkit may only be a dev-dependency", v.from),
+        "standalone dependency" => format!("{}: standalone crate must not depend on workspace crate {}", v.from, v.to),
         "forbidden external dependency" => {
-            format!("{source} (L{}) depends on UI crate `{target}`; UI toolkits are only allowed in L5+", level(source))
+            format!("{} (L{}) depends on UI crate `{}`; UI toolkits are only allowed in L5+", v.from, level(&v.from), v.to)
         }
         "disallowed layer edge" => {
-            classify(target)?;
-            format!("{source} (L{}) -> {target} (L{}) [{kind}]: may only depend on strictly lower layers", level(source), level(target))
+            classify(&v.to)?;
+            format!("{} (L{}) -> {} (L{}) [{kind}]: may only depend on strictly lower layers", v.from, level(&v.from), v.to, level(&v.to))
         }
-        _ => message,
+        _ => v.to_string(),
     })
 }
 
-pub fn report(crates: &[Crate]) -> Result<(String, usize), String> {
-    let mut violations: Vec<_> = craft_xtask::layers::check(&config(), crates)?.into_iter().filter_map(diagnostic).collect();
+pub fn render(report: &Report) -> (String, usize) {
+    let mut violations: Vec<_> = report.violations.iter().filter_map(diagnostic).collect();
     violations.sort();
     violations.dedup();
-    let mut output = String::from("Dependency layering (plan/architecture.md §3)\n\n");
-    writeln!(output, "{:<28} {:<14} workspace deps", "crate", "layer").map_err(|error| error.to_string())?;
-    for krate in crates {
-        let dependencies: Vec<_> = krate
+    let mut output = format!("Dependency layering (plan/architecture.md §3)\n\n{:<28} {:<14} workspace deps\n", "crate", "layer");
+    for krate in &report.crates {
+        let deps: Vec<_> = krate
             .deps
             .iter()
             .filter(|dep| dep.workspace)
@@ -203,23 +169,23 @@ pub fn report(crates: &[Crate]) -> Result<(String, usize), String> {
                 format!("{}{kind}", short_name(&dep.name))
             })
             .collect();
-        writeln!(output, "{:<28} {:<14} {}", krate.name, describe(classify(&krate.name)), dependencies.join(", "))
-            .map_err(|error| error.to_string())?;
+        let _ = writeln!(output, "{:<28} {:<14} {}", krate.name, describe(classify(&krate.name)), deps.join(", "));
     }
-    output.push('\n');
-    if violations.is_empty() {
-        writeln!(output, "OK: {} crates, no layering violations.", crates.len()).map_err(|error| error.to_string())?;
+    let _ = if violations.is_empty() {
+        writeln!(output, "\nOK: {} crates, no layering violations.", report.crates.len())
     } else {
-        writeln!(output, "{} violation(s):", violations.len()).map_err(|error| error.to_string())?;
-        for violation in &violations {
-            writeln!(output, "  - {violation}").map_err(|error| error.to_string())?;
-        }
-    }
-    Ok((output, violations.len()))
+        writeln!(output, "\n{} violation(s):\n  - {}", violations.len(), violations.join("\n  - "))
+    };
+    (output, violations.len())
+}
+
+#[cfg(test)]
+pub fn report(crates: &[Crate]) -> Result<(String, usize), String> {
+    Ok(render(&craft_xtask::layers::check_graph(&config(), crates)?))
 }
 
 pub(crate) fn cmd_layers() -> Result<(), String> {
-    let (output, violations) = report(&from_metadata(&metadata()?)?)?;
+    let (output, violations) = render(&compute(&config(), &Args::default())?);
     print!("{output}");
     if violations == 0 { Ok(()) } else { Err(format!("{violations} layering violation(s)")) }
 }
