@@ -8,6 +8,35 @@ use serde::Serialize;
 
 use crate::Rgba8;
 
+const SAMPLE_BUDGET: usize = 1_000_000;
+
+/// One reproducible jittered sample per contiguous stratum. Strata differ in size by at
+/// most one pixel; samples have equal weight, so unequal strata are approximately weighted.
+fn sample_indices(len: usize, budget: usize) -> impl Iterator<Item = usize> {
+    let count = len.min(budget);
+    let size = len.checked_div(count).unwrap_or(0);
+    let extra = len.checked_rem(count).unwrap_or(0);
+    (0..count).map(move |index| {
+        let start = index * size + index.min(extra);
+        let width = size + usize::from(index < extra);
+        let mut hash = (index as u64).wrapping_add(0x9e3779b97f4a7c15);
+        hash = (hash ^ (hash >> 30)).wrapping_mul(0xbf58476d1ce4e5b9);
+        hash = (hash ^ (hash >> 27)).wrapping_mul(0x94d049bb133111eb);
+        hash ^= hash >> 31;
+        start + (hash % width as u64) as usize
+    })
+}
+
+fn sampled<T>(mut pixels: impl ExactSizeIterator<Item = T>) -> impl Iterator<Item = T> {
+    let indices = sample_indices(pixels.len(), SAMPLE_BUDGET);
+    let mut position = 0;
+    indices.filter_map(move |index| {
+        let pixel = pixels.nth(index - position);
+        position = index + 1;
+        pixel
+    })
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct Histogram {
     pub r: Vec<u32>,
@@ -61,12 +90,11 @@ impl Histogram {
     }
 
     /// Histogram of linear RGB samples (1 = SDR white) reaching `stops` stops above SDR white.
-    /// `samples` are visited at most ~1 MP of them (evenly strided).
+    /// Visits at most one million reproducibly stratified samples; smaller inputs are exact.
     pub fn of_hdr(samples: &[[f32; 3]], stops: f32) -> Histogram {
         let bins = HdrBins { from: Self::HDR_FROM, stops };
         let mut h = Self::empty(Some(bins));
-        let step = (samples.len() / 1_000_000).max(1);
-        for c in samples.iter().step_by(step) {
+        for c in sampled(samples.iter()) {
             if c.iter().any(|&value| value > 1.0) {
                 *h.above_sdr_count.get_or_insert(0) += 1;
             }
@@ -80,11 +108,10 @@ impl Histogram {
     }
 
     /// HDR histogram of per-pixel bins already computed with `bins` (`[r, g, b, luma]` each),
-    /// visiting at most ~1 MP of them.
+    /// visiting at most one million reproducibly stratified samples.
     pub fn of_bins(px: impl ExactSizeIterator<Item = [u8; 4]>, bins: HdrBins) -> Histogram {
         let mut h = Self::empty(Some(bins));
-        let step = (px.len() / 1_000_000).max(1);
-        for [r, g, b, l] in px.step_by(step) {
+        for [r, g, b, l] in sampled(px) {
             if [r, g, b].iter().any(|&value| (value as usize) >= bins.from.clamp(2, Self::BINS - 1)) {
                 *h.above_sdr_count.get_or_insert(0) += 1;
             }
@@ -145,18 +172,13 @@ impl Histogram {
 
     pub fn of_srgb8(img: &Rgba8) -> Histogram {
         let mut h = Self::empty(None);
-        // Sample at most ~1 MP for speed.
-        let step = ((img.len() as f64 / 1_000_000.0).sqrt().ceil() as usize).max(1);
-        for y in (0..img.height).step_by(step) {
-            for x in (0..img.width).step_by(step) {
-                let p = img.get(x, y);
-                h.r[p[0] as usize] += 1;
-                h.g[p[1] as usize] += 1;
-                h.b[p[2] as usize] += 1;
-                let l = (p[0] as u32 * 54 + p[1] as u32 * 183 + p[2] as u32 * 19) >> 8;
-                h.luma[l.min(255) as usize] += 1;
-                h.total += 1;
-            }
+        for p in sampled(img.data.iter()) {
+            h.r[p[0] as usize] += 1;
+            h.g[p[1] as usize] += 1;
+            h.b[p[2] as usize] += 1;
+            let l = (p[0] as u32 * 54 + p[1] as u32 * 183 + p[2] as u32 * 19) >> 8;
+            h.luma[l.min(255) as usize] += 1;
+            h.total += 1;
         }
         h
     }
@@ -200,6 +222,35 @@ impl Histogram {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn periodic_stripes_are_not_phase_locked() {
+        let image = Rgba8::from_fn(2000, 1000, |x, _| if x % 2 == 0 { [0, 0, 0, 255] } else { [255, 255, 255, 255] });
+        let histogram = Histogram::of_srgb8(&image);
+        let fraction = histogram.r[0] as f32 / histogram.total as f32;
+        assert!((fraction - 0.5).abs() < 0.01, "black fraction {fraction}");
+        let pixels: Vec<_> = (0..2_000_000).map(|index| if index % 2 == 0 { [0.0; 3] } else { [1.0; 3] }).collect();
+        let histogram = Histogram::of_hdr(&pixels, 4.0);
+        let fraction = histogram.r[0] as f32 / histogram.total as f32;
+        assert!((fraction - 0.5).abs() < 0.01, "HDR black fraction {fraction}");
+        let bins = histogram.hdr.unwrap();
+        let histogram = Histogram::of_bins(pixels.iter().map(|pixel| [bins.bin(pixel[0]) as u8; 4]), bins);
+        let fraction = histogram.r[0] as f32 / histogram.total as f32;
+        assert!((fraction - 0.5).abs() < 0.01, "binned black fraction {fraction}");
+    }
+
+    #[test]
+    fn stratified_indices_are_bounded_unique_and_repeatable() {
+        for len in 0..100 {
+            for budget in 0..30 {
+                let indices: Vec<_> = sample_indices(len, budget).collect();
+                assert_eq!(indices.len(), len.min(budget));
+                assert!(indices.iter().all(|&index| index < len));
+                assert!(indices.windows(2).all(|pair| pair[0] < pair[1]));
+                assert_eq!(indices, sample_indices(len, budget).collect::<Vec<_>>());
+            }
+        }
+    }
 
     #[test]
     fn hdr_overflow_counts_disjoint_channels() {
