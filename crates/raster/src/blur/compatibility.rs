@@ -1,4 +1,4 @@
-use super::Gaussian;
+use super::RecursiveCompatibility;
 use crate::{Image, resample::Pixel};
 
 const LANES: usize = 8;
@@ -19,10 +19,10 @@ fn batches<T: Send, S: Send + Default>(data: &mut [T], length: usize, run: impl 
     }
 }
 
-impl Gaussian {
+impl RecursiveCompatibility {
     /// Filter built-in floating pixels with eight interleaved f64 recurrence chains and
     /// per-worker scratch. Columns traverse row-major blocks without an image transpose.
-    pub fn filter_image<const CHANNELS: usize, T: Pixel>(
+    pub(super) fn filter_image<const CHANNELS: usize, T: Pixel>(
         &self,
         image: &Image<T>,
         widen: impl Fn(T) -> [f64; CHANNELS] + Copy + Send + Sync,
@@ -30,9 +30,6 @@ impl Gaussian {
     ) -> Image<T> {
         if image.width == 0 || image.height == 0 {
             return image.clone();
-        }
-        if let Some(kernel) = &self.kernel {
-            return Sampled { kernel, widen, narrow }.filter_image(image);
         }
         let mut output = image.clone();
         batches(&mut output.data, image.width.saturating_mul(LANES), |forward: &mut Vec<Block<CHANNELS>>, _, pixels| {
@@ -130,97 +127,6 @@ impl Gaussian {
                     }
                 }
             }
-        }
-    }
-}
-
-struct Sampled<'a, Widen, Narrow> {
-    kernel: &'a [f32],
-    widen: Widen,
-    narrow: Narrow,
-}
-
-impl<Widen, Narrow> Sampled<'_, Widen, Narrow> {
-    fn filter_image<const CHANNELS: usize, T: Pixel>(&self, source: &Image<T>) -> Image<T>
-    where
-        Widen: Fn(T) -> [f64; CHANNELS] + Copy + Send + Sync,
-        Narrow: Fn([f64; CHANNELS]) -> T + Copy + Send + Sync,
-    {
-        const ROWS: usize = 64;
-        let mut output = Image::new(source.width, source.height);
-        batches(&mut output.data, source.width.saturating_mul(ROWS), |scratch: &mut (Vec<T>, (Vec<T>, Vec<[f64; CHANNELS]>)), band, pixels| {
-            let half = self.kernel.len() / 2;
-            let height = pixels.len() / source.width + 2 * half;
-            let mut horizontal = Image { width: source.width, height, data: std::mem::take(&mut scratch.0) };
-            horizontal.data.resize(source.width * height, T::default());
-            for (offset, row) in horizontal.data.chunks_mut(source.width).enumerate() {
-                let source_row = (band * ROWS + offset).saturating_sub(half).min(source.height - 1);
-                self.row::<true, CHANNELS, T>(source, source_row, row, &mut scratch.1);
-            }
-            for (offset, row) in pixels.chunks_mut(source.width).enumerate() {
-                self.row::<false, CHANNELS, T>(&horizontal, offset + half, row, &mut scratch.1);
-            }
-            scratch.0 = horizontal.data;
-        });
-        output
-    }
-
-    fn row<const ROWS: bool, const CHANNELS: usize, T: Pixel>(
-        &self,
-        source: &Image<T>,
-        row: usize,
-        pixels: &mut [T],
-        scratch: &mut (Vec<T>, Vec<[f64; CHANNELS]>),
-    ) where
-        Widen: Fn(T) -> [f64; CHANNELS] + Copy + Send + Sync,
-        Narrow: Fn([f64; CHANNELS]) -> T + Copy + Send + Sync,
-    {
-        let Self { kernel, widen, narrow } = self;
-        let (padded, values) = scratch;
-        let half = kernel.len() / 2;
-        if ROWS {
-            let input = &source.data[row * source.width..(row + 1) * source.width];
-            padded.resize(source.width + 2 * half, input[0]);
-            padded[..half].fill(input[0]);
-            padded[half..half + source.width].copy_from_slice(input);
-            padded[half + source.width..].fill(input[source.width - 1]);
-            if let Ok(weights) = <&[f32; 7]>::try_from(*kernel) {
-                for (window, pixel) in padded.array_windows::<7>().zip(pixels) {
-                    let mut value = [0.0; CHANNELS];
-                    for tap in 0..7 {
-                        let input = widen(window[tap]);
-                        for channel in 0..CHANNELS {
-                            value[channel] += input[channel] * f64::from(weights[tap]);
-                        }
-                    }
-                    *pixel = narrow(value);
-                }
-                return;
-            }
-        }
-        values.resize(pixels.len(), [0.0; CHANNELS]);
-        for (tap, &weight) in kernel.iter().enumerate() {
-            let input = if ROWS {
-                &padded[tap..tap + pixels.len()]
-            } else {
-                let source_row = row.saturating_add(tap).saturating_sub(half).min(source.height - 1);
-                &source.data[source_row * source.width..(source_row + 1) * source.width]
-            };
-            if tap == 0 {
-                for (value, &pixel) in values.iter_mut().zip(input) {
-                    *value = widen(pixel).map(|channel| 0.0 + channel * f64::from(weight));
-                }
-            } else {
-                for (value, &pixel) in values.iter_mut().zip(input) {
-                    let input = widen(pixel);
-                    for channel in 0..CHANNELS {
-                        value[channel] += input[channel] * f64::from(weight);
-                    }
-                }
-            }
-        }
-        for (pixel, &value) in pixels.iter_mut().zip(values.iter()) {
-            *pixel = narrow(value);
         }
     }
 }

@@ -10,6 +10,8 @@ rust-version = "1.95"
 repository = "https://github.com/storytold/lightcraft"
 
 [workspace.dependencies]
+# TODO(#2): repoint to the upstream craft-libs revision once craft-blur lands.
+craft-blur = { git = "https://github.com/cloudbring/craft-libs", branch = "algo/2-craft-blur" }
 craft-ui = { git = "https://github.com/storytold/craft-libs", rev = "c5a1cbfb5f9049f9270955caffb5bee5997aebf7", features = ["serde"] }
 craft-docpath = { version = "0.1.0", git = "https://github.com/storytold/craft-libs", rev = "c5a1cbfb5f9049f9270955caffb5bee5997aebf7" }
 # Canon CRW decoder shared with the other Craft apps

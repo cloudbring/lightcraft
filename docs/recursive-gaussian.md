@@ -174,6 +174,93 @@ acceptance threshold changes in this pass.
   1 GPU) are not claims of verification. The wasm build retains eight existing
   UI warnings; no new warnings are introduced.
 
+## Shared craft-blur migration (#2)
+
+The consumer pins `cloudbring/craft-libs` branch `algo/2-craft-blur` at
+`75bb40cf0c06b7e046874f389376acbfd86915ab` in `Cargo.lock`. The workspace
+dependency has a TODO to repoint to the upstream revision when the crate lands.
+No processing version, cache key, fixture or #176 acceptance test is changed.
+
+V3 uses `craft_blur::Gaussian` with `Quality::Recursive` and `Edge::Clamp`,
+except for **2.5 <= sigma < 8**. The local sampled-kernel implementation and
+unused #33 helper are removed. Native floating pixels expose their existing
+storage as safe flat slices, without a channel conversion or second image copy.
+Recursive rows and disjoint column stripes retain per-worker reusable scratch;
+sampled output bands use the crate's tiled API with source halos and reusable
+per-worker scratch, retaining parallelism without duplicating convolution code.
+
+### Compatibility decisions and upstream blocker
+
+`BoxApprox` is **not** a bit-identical replacement for V1/V2. Its f64 running
+sums differ from LightCraft's f32 running sums, even at sigma 1: on a seeded
+257 x 131 signed random plane, 30,681 of 33,667 output samples differ in bits.
+`gaussian_box`, its radii, horizontal passes and re-primed vertical bands remain
+unchanged, including for the GPU and existing non-versioned callers.
+
+The supplied crate's **public Recursive quality is not fully bit-identical to
+39aa4d25 either**: it selects the sampled kernel below sigma 8 to enforce its
+0.01 shape-error contract, whereas V3 selects recurrence from sigma 2.5.
+At sigma 4 all 33,667 samples in that random plane differ. Its raw recursive
+constructor and pass execution are private, so the current public API cannot
+express V3's existing response in this interval. The original coefficients,
+scalar line hook and vectorized recurrence are retained exclusively for this
+compatibility interval in `RecursiveCompatibility` and `blur/compatibility.rs`.
+This also avoids regressing the interval to a slower scalar/transpose path.
+
+**Unfinished:** removing that last recurrence and making V3 a wholly thin
+wrapper requires an upstream compatibility constructor/executor that retains
+the original 2.5 transition without weakening the public quality contract.
+Changing V3 output or a saved processing version to hide this mismatch is not
+part of this migration. The new tests explicitly demonstrate both incompatible
+shared paths, alongside frozen baseline hashes for random planes.
+
+### Identity and timing evidence
+
+An isolated reference package was built from the original raster sources at
+`39aa4d256939c3703f1e22c0f2a715a4c98a189f`, under the disposable `target-2`
+directory. Direct `f32::to_bits` comparisons cover 13 dimensions (empty planes,
+singletons, thin/tail dimensions and 4097-pixel lines), 20 sigmas including both
+transitions, NaN/infinity, signed random values, and plane/RGB/RGBA pixels.
+Both Gaussian and legacy boxes match: **1,560 cases / 57,494,080 samples /
+zero differing bits**, independently with one and four Rayon workers.
+
+After CI completed and its debug artifacts were removed to relieve disk
+pressure, the same-binary, alternating, best-of-nine 24 MP single-worker release
+run, including allocations, measured:
+
+| Sigma | Original 39aa4d25 ms | Shared consumer ms | Change |
+|---:|---:|---:|---:|
+| 1 | 33.45 | 34.30 | +2.55% |
+| 8 | 70.38 | 69.93 | -0.65% |
+| 64 | 70.50 | 69.93 | -0.81% |
+
+This run meets both the 5% same-run regression budget and the historical
+33.6 / 70.5 / 70.2 ms targets within 5%. An immediate repeat measured reference
+53.42 / 96.07 / 101.07 ms and consumer 54.57 / 99.43 / 97.63 ms, also within
+the same-run budget (+2.15% / +3.50% / -3.40%), but not the historical absolute
+times. The shared host remains sensitive to concurrent workloads.
+
+Earlier runs during concurrent builds included reference 51.10 / 155.52 /
+137.93 ms and consumer 71.75 / 219.98 / 179.10 ms. Those loaded runs exceeded
+the regression budget; the post-cleanup acceptance measurements are not a
+claim of a stable 5% bound under arbitrary concurrent host workloads.
+
+The blur module files remove **59 net lines** (651 down to 592 across the
+blur module and its helper), excluding added integration tests/documentation.
+The unchanged #176 numerical/fixture tests and three new compatibility tests
+pass: raster/pipeline **265 passed / 0 failed / 3 ignored**; raster without
+default features **38 / 0**; release #176 accuracy tests **6 / 0**. Workspace
+clippy with `--all-targets -- -D warnings`, fmt, layers (33 crates), assets
+(42 attributed files) and wasm pass. Full `cargo xtask ci` also passes with
+`CRAFT_FONTS_DIR` set to the existing craft-fonts checkout: **5,606 workspace
+tests passed / 0 failed / 43 ignored**, plus 152 separately recorded runtime
+skips (141 corpus, 8 model, 2 fonts, 1 GPU), not claims of verification. The
+initial CI attempt without craft-fonts hit the existing missing Georgian glyph
+failure in the Settings dialog; the font-enabled rerun passes that test.
+Wasm retains the eight existing UI warnings. All checks use the rustup toolchain
+and worktree-local `target-2` directory; the reference sources, executables,
+build artifacts and generated `target/ci` reports are removed afterward.
+
 ## Pass-1 validation
 
 Native and wasm checks use the rustup stable toolchain (rustc/cargo 1.99.0),

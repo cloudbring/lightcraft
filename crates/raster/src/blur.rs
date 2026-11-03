@@ -1,45 +1,19 @@
-//! Separable Gaussian blur: variance-exact sampled windows below 2.5 px, otherwise a
-//! third-order Young–van Vliet recursive filter with Triggs–Sdika clamp boundaries.
+//! Gaussian blur via craft-blur, with the original V3 recurrence retained at sigma 2.5–8.
+//! craft-blur samples that guard band, which would change existing V3 renders.
 //! [`gaussian_box`] preserves the legacy process and the GPU's three-box approximation.
 
 use crate::resample::Pixel;
 use crate::{Image, par_rows};
 
-mod interleaved;
+use craft_blur::{Cancel, Edge, Quality, Scratch, Shape};
+
+mod compatibility;
 
 /// The largest blur sigma (pixels) the box radii are made for. A box wider than any image (the
 /// encoders' limit is 65535 px) blurs to the same flat result, and a larger sigma made the box
 /// width's square overflow (from about 23 170 px: a panic where overflow is checked, a garbage
 /// radius of billions of pixels, i.e. a hung render, where it isn't).
 pub const MAX_SIGMA: f32 = 65_536.0;
-
-/// A normalized sampled Gaussian whose discrete variance is `sigma²`.
-///
-/// Returns `None` for non-finite, non-positive or greater-than-33-pixel sigmas, bounding its cost.
-pub fn variance_exact_kernel(sigma: f32) -> Option<Vec<f32>> {
-    if !sigma.is_finite() || sigma <= 0.0 || sigma > 33.0 {
-        return None;
-    }
-    let half = (3.0 * sigma).ceil() as i32;
-    let target = f64::from(sigma).powi(2);
-    let sample = |width: f64| {
-        let mut weights: Vec<f64> = (-half..=half).map(|offset| (-f64::from(offset * offset) / (2.0 * width * width)).exp()).collect();
-        let sum: f64 = weights.iter().sum();
-        weights.iter_mut().for_each(|weight| *weight /= sum);
-        weights
-    };
-    let (mut low, mut high) = (f64::from(sigma) * 0.01, f64::from(sigma) * 2.0 + 1.0);
-    for _ in 0..48 {
-        let middle = (low + high) * 0.5;
-        let variance: f64 = sample(middle).iter().enumerate().map(|(index, weight)| weight * (index as f64 - f64::from(half)).powi(2)).sum();
-        if variance < target {
-            low = middle;
-        } else {
-            high = middle;
-        }
-    }
-    Some(sample((low + high) * 0.5).into_iter().map(|weight| weight as f32).collect())
-}
 
 /// Box radii approximating a Gaussian of `sigma` with 3 passes (Kovesi / Wells). A sigma that is
 /// not a number counts as 0 (no blur); one above [`MAX_SIGMA`] (infinity too) as `MAX_SIGMA`.
@@ -158,17 +132,127 @@ pub fn gaussian_box<T: Pixel>(img: &Image<T>, sigma: f32) -> Image<T> {
     a
 }
 
-/// Precomputed one-dimensional Gaussian. Native pixels use f64 recurrence state and scratch;
-/// the default [`Pixel::gaussian_line`] keeps external pixel implementations source-compatible.
+/// Precomputed Gaussian, retaining the V3 response where craft-blur's quality guard differs.
 pub struct Gaussian {
     sigma: f32,
-    kernel: Option<Vec<f32>>,
+    shared: Option<craft_blur::Gaussian>,
+    compatibility: Option<RecursiveCompatibility>,
+}
+
+impl Gaussian {
+    fn new(sigma: f32) -> Result<Self, craft_blur::Error> {
+        if (2.5..8.0).contains(&sigma) {
+            return Ok(Self { sigma, shared: None, compatibility: Some(RecursiveCompatibility::new(sigma)) });
+        }
+        Ok(Self { sigma, shared: Some(craft_blur::Gaussian::new(sigma, Quality::Recursive)?), compatibility: None })
+    }
+
+    /// Compatibility implementation for custom pixel types that retain legacy box filtering.
+    pub fn filter_pixels<T: Pixel>(&self, line: &mut [T]) {
+        let mut scratch = Vec::new();
+        for radius in box_radii(self.sigma) {
+            box_row(line, &mut scratch, radius);
+        }
+    }
+
+    /// Filter one line, converting a custom pixel to and from fixed-size channels.
+    pub fn filter<const CHANNELS: usize, T: Copy>(
+        &self,
+        line: &mut [T],
+        widen: impl Fn(T) -> [f64; CHANNELS],
+        narrow: impl Fn([f64; CHANNELS]) -> T,
+    ) {
+        if let Some(compatibility) = &self.compatibility {
+            compatibility.filter(line, widen, narrow);
+        } else if let Some(filter) = &self.shared {
+            let Ok(shape) = Shape::new(line.len(), 1, CHANNELS) else { return };
+            let mut pixels: Vec<[f32; CHANNELS]> = line.iter().map(|&pixel| widen(pixel).map(|value| value as f32)).collect();
+            if filter.filter_rows(pixels.as_flattened_mut(), shape, Edge::Clamp, &mut Scratch::default(), Cancel::Never).is_ok() {
+                for (pixel, value) in line.iter_mut().zip(pixels) {
+                    *pixel = narrow(value.map(f64::from));
+                }
+            }
+        }
+    }
+
+    pub(crate) fn filter_packed<const CHANNELS: usize, T: Pixel>(
+        &self,
+        image: &Image<T>,
+        flatten: impl Fn(&mut [T]) -> &mut [f32] + Sync,
+        widen: impl Fn(T) -> [f64; CHANNELS] + Copy + Send + Sync,
+        narrow: impl Fn([f64; CHANNELS]) -> T + Copy + Send + Sync,
+    ) -> Option<Image<T>> {
+        if let Some(compatibility) = &self.compatibility {
+            return Some(compatibility.filter_image(image, widen, narrow));
+        }
+        let filter = self.shared.as_ref()?;
+        let shape = Shape::new(image.width, image.height, CHANNELS).ok()?;
+        #[cfg(feature = "parallel")]
+        if rayon::current_num_threads() > 1
+            && let craft_blur::Separable::Kernel(kernel) = filter.separable()
+        {
+            use rayon::prelude::*;
+            const ROWS: usize = 64;
+            let half = kernel.len() / 2;
+            let mut output = Image::new(image.width, image.height);
+            output
+                .data
+                .par_chunks_mut(image.width.saturating_mul(ROWS))
+                .enumerate()
+                .try_for_each_init(
+                    || (Vec::new(), Scratch::default()),
+                    |(tile, scratch), (band, pixels)| -> Result<(), craft_blur::Error> {
+                        let row = band * ROWS;
+                        let start = row.saturating_sub(half);
+                        let end = row.saturating_add(pixels.len() / image.width).saturating_add(half).min(image.height);
+                        tile.clear();
+                        tile.extend_from_slice(&image.data[start * image.width..end * image.width]);
+                        let tile_shape = Shape::new(image.width, end - start, CHANNELS)?;
+                        filter.apply(flatten(tile), tile_shape, Edge::Clamp, scratch, Cancel::Never)?;
+                        let offset = (row - start) * image.width;
+                        pixels.copy_from_slice(&tile[offset..offset + pixels.len()]);
+                        Ok(())
+                    },
+                )
+                .ok()?;
+            return Some(output);
+        }
+        let mut output = image.clone();
+        apply_shared(filter, flatten(&mut output.data), shape).ok()?;
+        Some(output)
+    }
+}
+
+fn apply_shared(filter: &craft_blur::Gaussian, pixels: &mut [f32], shape: Shape) -> Result<(), craft_blur::Error> {
+    #[cfg(feature = "parallel")]
+    if rayon::current_num_threads() > 1 && matches!(filter.separable(), craft_blur::Separable::Recursive(_)) {
+        use rayon::prelude::*;
+        let row_samples = shape.width() * shape.channels();
+        pixels.par_chunks_mut(row_samples * craft_blur::LINE_BATCH).try_for_each_init(Scratch::default, |scratch, batch| {
+            let batch_shape = Shape::new(shape.width(), batch.len() / row_samples, shape.channels())?;
+            filter.filter_rows(batch, batch_shape, Edge::Clamp, scratch, Cancel::Never)
+        })?;
+        let stripe_width = shape.width().div_ceil(rayon::current_num_threads()).div_ceil(craft_blur::LINE_BATCH) * craft_blur::LINE_BATCH;
+        let mut stripes: Vec<Vec<&mut [f32]>> = (0..shape.width().div_ceil(stripe_width)).map(|_| Vec::with_capacity(shape.height())).collect();
+        for row in pixels.chunks_mut(row_samples) {
+            for (stripe, samples) in stripes.iter_mut().zip(row.chunks_mut(stripe_width * shape.channels())) {
+                stripe.push(samples);
+            }
+        }
+        return stripes.par_iter_mut().try_for_each_init(Scratch::default, |scratch, stripe| {
+            filter.filter_columns(stripe, shape.channels(), Edge::Clamp, scratch, Cancel::Never)
+        });
+    }
+    filter.apply(pixels, shape, Edge::Clamp, &mut Scratch::default(), Cancel::Never)
+}
+
+struct RecursiveCompatibility {
     feedback: [f64; 3],
     gain: f64,
     boundary: [[f64; 3]; 3],
 }
 
-impl Gaussian {
+impl RecursiveCompatibility {
     fn new(sigma: f32) -> Self {
         let sigma64 = f64::from(sigma);
         let mut q = if sigma64 < 3.556 { -0.2568 + 0.5784 * sigma64 + 0.0561 * sigma64 * sigma64 } else { 2.5091 + 0.9804 * (sigma64 - 3.556) };
@@ -198,45 +282,11 @@ impl Gaussian {
             ],
         ]
         .map(|row| row.map(|value| value * scale * gain));
-        Self { sigma, kernel: (sigma < 2.5).then(|| variance_exact_kernel(sigma)).flatten(), feedback, gain, boundary }
+        Self { feedback, gain, boundary }
     }
 
-    /// Compatibility implementation for custom pixel types; built-in floating pixels override
-    /// this hook to retain all recurrence state in f64.
-    pub fn filter_pixels<T: Pixel>(&self, line: &mut [T]) {
-        let mut scratch = Vec::new();
-        for radius in box_radii(self.sigma) {
-            box_row(line, &mut scratch, radius);
-        }
-    }
-
-    /// Filter one line with f64 state, converting a custom pixel to and from fixed-size channels.
-    /// Implement [`Pixel::gaussian_line`] with this method to opt a custom pixel into the new path.
-    pub fn filter<const CHANNELS: usize, T: Copy>(
-        &self,
-        line: &mut [T],
-        widen: impl Fn(T) -> [f64; CHANNELS],
-        narrow: impl Fn([f64; CHANNELS]) -> T,
-    ) {
+    fn filter<const CHANNELS: usize, T: Copy>(&self, line: &mut [T], widen: impl Fn(T) -> [f64; CHANNELS], narrow: impl Fn([f64; CHANNELS]) -> T) {
         let Some((&left, &right)) = line.first().zip(line.last()) else { return };
-        if let Some(kernel) = &self.kernel {
-            let half = kernel.len() / 2;
-            let mut source = vec![widen(left); half];
-            source.extend(line.iter().copied().map(&widen));
-            source.extend(std::iter::repeat_n(widen(right), half));
-            let mut values = vec![[0.0; CHANNELS]; line.len()];
-            for (tap, &weight) in kernel.iter().enumerate() {
-                for (value, sample) in values.iter_mut().zip(&source[tap..]) {
-                    for channel in 0..CHANNELS {
-                        value[channel] += sample[channel] * f64::from(weight);
-                    }
-                }
-            }
-            for (pixel, value) in line.iter_mut().zip(values) {
-                *pixel = narrow(value);
-            }
-            return;
-        }
         let left = widen(left);
         let right = widen(right);
         let mut state = [[0.0; CHANNELS]; 3];
@@ -298,7 +348,7 @@ pub fn gaussian<T: Pixel>(img: &Image<T>, sigma: f32) -> Image<T> {
         return img.clone();
     }
     let sigma = sigma.min(MAX_SIGMA).min((img.width.max(img.height) as f32 * 2.0).max(1.0));
-    let filter = Gaussian::new(sigma);
+    let Ok(filter) = Gaussian::new(sigma) else { return img.clone() };
     if let Some(output) = T::gaussian_image(img, &filter) {
         return output;
     }
@@ -317,21 +367,6 @@ mod accuracy_tests;
 
 #[cfg(test)]
 mod tests {
-    #[test]
-    fn exact_kernel_has_requested_variance() {
-        for sigma in [0.3f32, 0.5, 0.7, 1.0, 1.5, 2.0, 4.0, 8.0, 16.0, 33.0] {
-            let kernel = super::variance_exact_kernel(sigma).expect("valid sigma");
-            let half = kernel.len() / 2;
-            let sum: f32 = kernel.iter().sum();
-            let variance: f32 = kernel.iter().enumerate().map(|(index, weight)| weight * (index as f32 - half as f32).powi(2)).sum();
-            assert!((sum - 1.0).abs() < 1e-5, "sigma {sigma}: sum {sum}");
-            assert!((variance / sigma.powi(2) - 1.0).abs() < 0.01, "sigma {sigma}: variance {variance}");
-        }
-        for sigma in [0.0, -1.0, f32::NAN, f32::INFINITY, 33.01] {
-            assert!(super::variance_exact_kernel(sigma).is_none());
-        }
-    }
-
     /// The box radii of the formula as it was, for the check below.
     fn box_radii_before(sigma: f32) -> [usize; 3] {
         let n = 3.0f32;
