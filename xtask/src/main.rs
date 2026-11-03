@@ -1,6 +1,6 @@
 //! Workspace tooling: `cargo xtask <command>`.
 //!
-//! Pure Rust (std + serde_json; flate2/brotli for the web bundle). External tools (`cargo`, `curl`, `tar`) are
+//! Pure Rust (craft-xtask + serde_json; flate2/brotli for the web bundle). External tools (`cargo`, `curl`, `tar`) are
 //! invoked through `std::process::Command`.
 
 mod assets;
@@ -8,11 +8,9 @@ mod bench;
 mod ci_lock;
 mod ci_quick;
 mod ci_report;
-mod ico;
+#[path = "task_policy.rs"]
 mod layers;
 mod parity;
-mod stats;
-mod version;
 mod web;
 
 use std::path::{Path, PathBuf};
@@ -71,9 +69,12 @@ commands:
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let rest: Vec<&str> = args.iter().skip(1).map(String::as_str).collect();
+    let shared_args: Vec<String> = args.iter().skip(1).cloned().collect();
+    let mut configs = craft_xtask::Configs::for_root(root());
+    configs.stats.follow_symlinks = true;
     let result = match args.first().map(String::as_str) {
-        Some("ico") => ico::run(&rest),
-        Some("version") => version::run(&root(), &rest),
+        Some("ico") => craft_xtask::ico::run(&craft_xtask::ico::Config::default(), &shared_args),
+        Some("version") => craft_xtask::version::run(&configs.version, &shared_args),
         Some("layers") => cmd_layers(),
         Some("assets") => assets::run(&root()),
         Some("bench") => bench::run(&root(), &rest),
@@ -82,13 +83,13 @@ fn main() -> ExitCode {
         Some("web") => web::run(&rest),
         Some("ci") => cmd_ci(&rest),
         Some("corpus") => cmd_corpus(rest.contains(&"--download")),
-        Some("stats") => stats::run(&root(), rest.contains(&"--exact")),
+        Some("stats") => craft_xtask::stats::run(&configs.stats, &if rest.contains(&"--exact") { vec!["--exact".into()] } else { vec![] }),
         Some("raw-frame") => cmd_raw_frame(&rest),
         Some("-h" | "--help" | "help") | None => {
-            print!("{USAGE}");
+            print!("{}", usage());
             Ok(())
         }
-        Some(other) => Err(format!("unknown command `{other}`\n\n{USAGE}")),
+        Some(other) => Err(format!("unknown command `{other}`\n\n{}", usage())),
     };
     match result {
         Ok(()) => ExitCode::SUCCESS,
@@ -97,6 +98,15 @@ fn main() -> ExitCode {
             ExitCode::FAILURE
         }
     }
+}
+
+fn usage() -> String {
+    format!(
+        "{USAGE}\nShared task syntax:\n  {}\n  {}\n  {}\n",
+        craft_xtask::version::cli_help(),
+        craft_xtask::stats::cli_help(),
+        craft_xtask::ico::cli_help().replace("ico/icns <out.ico|out.icns>", "ico <out.ico>")
+    )
 }
 
 /// `cargo xtask raw-frame FILE…`: runs the `raw_frame` example of `lightcraft-engine` on the files.

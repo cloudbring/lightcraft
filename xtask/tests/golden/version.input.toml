@@ -1,0 +1,7 @@
+[workspace]
+resolver = "3"
+members = ["member"]
+
+[workspace.package]
+version = "0.18.0" # retain this comment
+edition = "2024"

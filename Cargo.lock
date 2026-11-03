@@ -1200,6 +1200,14 @@ version = "0.1.0"
 source = "git+https://github.com/storytold/craft-libs?rev=c5a1cbfb5f9049f9270955caffb5bee5997aebf7#c5a1cbfb5f9049f9270955caffb5bee5997aebf7"
 
 [[package]]
+name = "craft-hash"
+version = "0.1.0"
+source = "git+https://github.com/cloudbring/craft-libs?branch=algo%2Fintegration#fc32458ed74683e2db4749c3e3a4763fefcc7903"
+dependencies = [
+ "sha2",
+]
+
+[[package]]
 name = "craft-i18n"
 version = "0.1.0"
 source = "git+https://github.com/storytold/craft-libs?rev=c5a1cbfb5f9049f9270955caffb5bee5997aebf7#c5a1cbfb5f9049f9270955caffb5bee5997aebf7"
@@ -1278,6 +1286,17 @@ dependencies = [
  "objc2 0.6.5",
  "objc2-app-kit 0.3.2",
  "wayland-client",
+]
+
+[[package]]
+name = "craft-xtask"
+version = "0.1.0"
+source = "git+https://github.com/cloudbring/craft-libs?branch=algo%2Fintegration#fc32458ed74683e2db4749c3e3a4763fefcc7903"
+dependencies = [
+ "craft-hash",
+ "glob",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -2634,6 +2653,12 @@ dependencies = [
  "smallvec",
  "vello_common",
 ]
+
+[[package]]
+name = "glob"
+version = "0.3.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e4eba85ea1d0a966a983acd07deee566e67395d2d96b6fb39e62b5a833f1eb0b"
 
 [[package]]
 name = "glow"
@@ -7836,9 +7861,9 @@ name = "xtask"
 version = "0.18.0"
 dependencies = [
  "brotli",
+ "craft-xtask",
  "flate2",
  "serde_json",
- "sha2",
 ]
 
 [[package]]

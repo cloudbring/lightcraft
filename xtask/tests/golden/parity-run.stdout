@@ -1,0 +1,13 @@
+Lightroom parity (docs/parity-checklist.md): 4 rows, 3 references
+
+| Section | ✅ | 🟡 | ⬜ | 🚫 | P0 done | P1 done |
+|---|---:|---:|---:|---:|---:|---:|
+| A. Import (IMP) | 1 | 1 | 0 | 1 | 1/1 (100%) | 0/1 (0%) |
+| B. Library (LIB) | 0 | 0 | 1 | 0 | 0/1 (0%) | — |
+| **Total** | 1 | 1 | 1 | 1 | 1/2 (50%) | 0/1 (0%) |
+
+Weighted completion (✅ = 1, 🟡 = ½, 🚫 left out): **50.0%** of 3 in-scope rows — P0 50.0% of 2 · P1 50.0% of 1.
+
+note: the summary in docs/parity-checklist.md is stale — run `cargo xtask parity --write`
+
+OK: every command, control and path referenced in docs/parity-checklist.md exists; docs/gaps.md lists each gap once.

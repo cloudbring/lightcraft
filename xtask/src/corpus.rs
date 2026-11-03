@@ -1,5 +1,6 @@
 use super::raw_samples::RAW_SAMPLES;
-use super::{Command, Path, root, run};
+use super::{Command, root, run};
+use craft_xtask::sha256_hex as file_sha256;
 
 pub(crate) fn cmd_corpus(download: bool) -> Result<(), String> {
     let corpus = root().join("corpus");
@@ -44,14 +45,6 @@ Tests that use a corpus skip cleanly when it is absent.
   "
         )
     ))
-}
-
-fn file_sha256(path: &Path) -> Result<String, String> {
-    use sha2::{Digest, Sha256};
-    let mut file = std::fs::File::open(path).map_err(|e| format!("open {}: {e}", path.display()))?;
-    let mut hash = Sha256::new();
-    std::io::copy(&mut file, &mut hash).map_err(|e| format!("read {}: {e}", path.display()))?;
-    Ok(format!("{:x}", hash.finalize()))
 }
 
 #[cfg(test)]

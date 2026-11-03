@@ -10,8 +10,8 @@ workspace = true
 
 [dependencies]
 serde_json = { workspace = true }
-# corpus download checksums
-sha2 = { workspace = true }
+# TODO: repoint to storytold/craft-libs after upstream merge
+craft-xtask = { git = "https://github.com/cloudbring/craft-libs", branch = "algo/integration" }
 # precompressed web bundle (`cargo xtask web`); pure Rust
 flate2 = "1"
 brotli = { version = "9", default-features = false, features = ["std"] }

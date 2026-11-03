@@ -1,0 +1,39 @@
+crate                       files    lines #[test]  proptest!
+--------------------------------------------------------------
+lightcraft                     21     5799     101          0
+lightcraft-catalog             36    15965     290          4
+lightcraft-cli                  5     2329      42          0
+lightcraft-codecs              33    11654     159          1
+lightcraft-color                5      942      25          0
+lightcraft-denoise             13     3341      30          0
+lightcraft-denoise-core        11     2386      43          0
+lightcraft-develop              6     2991      37          0
+lightcraft-engine             246   100755    1466          0
+lightcraft-faces               20     6338      80          0
+lightcraft-fetch                3     1700      28          0
+lightcraft-geocode              2      444       9          0
+lightcraft-geom                 6     1980      49          2
+lightcraft-gpu                 15     7629      76          0
+lightcraft-heif                 7     2381      29          0
+lightcraft-inpaint              3      845       5          0
+lightcraft-lensdb               4     1273      24          0
+lightcraft-mcp                 11     3536      63          0
+lightcraft-merge               20     5191      46          0
+lightcraft-meta                19     7694     154          1
+lightcraft-pipeline            36    14156     228          0
+lightcraft-preview              6     2039      27          0
+lightcraft-raster               7     1476      30          0
+lightcraft-raw                 88    40655     651          5
+lightcraft-scenes               4     1038       5          0
+lightcraft-segment             17     2486      15          0
+lightcraft-slideshow            3      998      15          0
+lightcraft-sysmem               1       80       3          0
+lightcraft-testkit              1      194       4          0
+lightcraft-tiff                 8     2438      31          1
+lightcraft-ui-egui            280   111249    1807          0
+lightcraft-web                 12     4196      37          0
+xtask                          16     6112      56          0
+--------------------------------------------------------------
+TOTAL                         965   372290    5665         14
+
+(#[test] counts source attributes; macro-generated tests count once. Use --exact for harness counts.)

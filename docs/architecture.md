@@ -8,7 +8,7 @@ on 2026-10-10 (≈ 202,000 tracked lines in 505 files: 24 library crates, 3 apps
 
 ## Layers
 
-`cargo xtask layers` (part of `cargo xtask ci`, `xtask/src/layers.rs`) enforces that nothing below
+`cargo xtask layers` (part of `cargo xtask ci`, `xtask/src/task_policy.rs`) enforces that nothing below
 L5 depends on egui, eframe, winit or rfd, and that each crate only uses lower layers.
 
 | Layer | Crates (lines) | Role |

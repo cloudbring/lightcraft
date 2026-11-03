@@ -1,0 +1,38 @@
+Dependency layering (plan/architecture.md §3)
+
+crate                        layer          workspace deps
+lightcraft                   exempt         codecs, engine, raster, sysmem, ui-egui, testkit (dev)
+lightcraft-catalog           L3             develop, meta, raw, geom (dev), testkit (dev)
+lightcraft-cli               exempt         codecs, denoise, engine, mcp, merge, raster, sysmem, ui-egui, testkit (dev)
+lightcraft-codecs            L1             color, geom, heif, raster, heif (dev), testkit (dev)
+lightcraft-color             L0             geom
+lightcraft-denoise           L1             denoise-core, raster
+lightcraft-denoise-core      L1             raster
+lightcraft-develop           L1             color, geom
+lightcraft-engine            L4             catalog, codecs, color, denoise, denoise-core, develop, faces, geocode, geom, gpu, lensdb, merge, meta, pipeline, preview, raster, raw, scenes, segment, slideshow, heif (dev), testkit (dev), tiff (dev), fetch
+lightcraft-faces             L1             testkit (dev)
+lightcraft-fetch             L0             
+lightcraft-geocode           L1             
+lightcraft-geom              L0             
+lightcraft-gpu               L3             color, denoise, develop, faces, geom, pipeline, raster, raw (dev), scenes (dev), testkit (dev)
+lightcraft-heif              L0             
+lightcraft-inpaint           L1             
+lightcraft-lensdb            L2             develop, geom
+lightcraft-mcp               L5             codecs, engine, raster
+lightcraft-merge             L3             codecs, color, geom, meta, raster, raw, scenes
+lightcraft-meta              L1             geom, tiff, heif (dev)
+lightcraft-pipeline          L2             color, develop, geom, inpaint, raster, raw, scenes (dev)
+lightcraft-preview           L3             raster
+lightcraft-raster            L0             color, geom
+lightcraft-raw               L1             color, geom, meta, raster, tiff, testkit (dev)
+lightcraft-scenes            L1             color, raster
+lightcraft-segment           L3             testkit (dev), fetch
+lightcraft-slideshow         L1             raster
+lightcraft-sysmem            L0             
+lightcraft-testkit           testkit        
+lightcraft-tiff              L0             
+lightcraft-ui-egui           L5             catalog, color, develop, engine, geom, meta, pipeline, preview, raster, slideshow, codecs (dev), denoise (dev), engine (dev), faces (dev), merge (dev), testkit (dev)
+lightcraft-web               exempt         codecs, engine, preview, raster, ui-egui
+xtask                        exempt         
+
+OK: 33 crates, no layering violations.
