@@ -1182,6 +1182,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "craft-atomic"
+version = "0.1.0"
+source = "git+https://github.com/storytold/craft-libs?rev=f3b62ec61f45534392376492fc5ad33047375205#f3b62ec61f45534392376492fc5ad33047375205"
+dependencies = [
+ "rustix 1.1.5",
+]
+
+[[package]]
 name = "craft-crw"
 version = "0.1.0"
 source = "git+https://github.com/storytold/craft-libs?rev=f3b62ec61f45534392376492fc5ad33047375205#f3b62ec61f45534392376492fc5ad33047375205"
@@ -3547,6 +3555,7 @@ name = "lightcraft"
 version = "0.18.0"
 dependencies = [
  "chrono",
+ "craft-atomic",
  "craft-update",
  "eframe",
  "egui",
@@ -3574,6 +3583,7 @@ name = "lightcraft-catalog"
 version = "0.18.0"
 dependencies = [
  "chrono",
+ "craft-atomic",
  "crc32fast",
  "dhat",
  "lightcraft-develop",
@@ -3698,6 +3708,7 @@ version = "0.18.0"
 dependencies = [
  "ab_glyph",
  "chrono",
+ "craft-atomic",
  "craft-docpath",
  "harfrust 0.13.3",
  "jxl-oxide",

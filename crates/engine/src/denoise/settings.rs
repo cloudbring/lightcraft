@@ -68,12 +68,7 @@ pub(crate) fn read_settings(dir: &Path) -> Settings {
 
 /// Write a file next to its final name and rename it into place.
 pub(crate) fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
-    let part = path.with_extension("part");
-    std::fs::write(&part, bytes).map_err(|e| format!("could not write {}: {e}", path.display()))?;
-    std::fs::rename(&part, path).map_err(|e| {
-        let _ = std::fs::remove_file(&part);
-        format!("could not write {}: {e}", path.display())
-    })
+    craft_atomic::atomic_write(path, bytes).map_err(|e| format!("could not write {}: {e}", path.display()))
 }
 
 pub(crate) fn write_settings(dir: &Path, st: &Settings) -> Result<(), String> {

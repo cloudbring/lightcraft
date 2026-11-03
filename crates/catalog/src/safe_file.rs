@@ -21,16 +21,15 @@
 //! - [`write_new`] / [`write_new_unique`] write a file that must not exist yet: the same temp file
 //!   and sync, plus a read-back check, and the file then appears under its final name **without
 //!   replacing anything** (a hard link, which fails on a taken name; where the volume has no hard
-//!   links, an exclusive create that claims the name, then a rename over that placeholder).
+//!   links, an exclusive create and copy, which can be visible before the copy is complete).
 //! - [`same_file`] tells whether two paths name the same file on disk (device + inode on Unix,
 //!   volume serial number + file index on Windows,
 //!   resolved paths elsewhere), for "is this target an original?" checks.
 
-use std::cell::Cell;
-use std::fs::{self, File, OpenOptions};
+use std::cell::{Cell, RefCell};
+use std::fs::{self, File};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
 
 thread_local! {
     static FAIL_AFTER: Cell<Option<u64>> = const { Cell::new(None) };
@@ -96,58 +95,11 @@ impl<W: Write> Write for Limited<W> {
     }
 }
 
-fn parent_of(path: &Path) -> &Path {
-    path.parent().filter(|d| !d.as_os_str().is_empty()).unwrap_or(Path::new("."))
-}
-
 /// Make a rename or a new name in `dir` durable (POSIX). Opening a directory fails on Windows,
 /// where NTFS journals the rename itself, so errors are ignored.
 pub fn sync_dir(dir: &Path) {
     if let Ok(d) = File::open(dir) {
         let _ = sync_file(&d);
-    }
-}
-
-/// A new, empty temp file next to `path` (hidden, unique in this process and folder).
-fn create_temp(path: &Path) -> io::Result<(PathBuf, File)> {
-    static N: AtomicU64 = AtomicU64::new(0);
-    if path.file_name().is_none() {
-        return Err(io::Error::new(io::ErrorKind::InvalidInput, format!("{} is not a file path", path.display())));
-    }
-    let dir = parent_of(path);
-    for _ in 0..1000 {
-        let tmp = dir.join(format!(".lightcraft-{}-{}.tmp", std::process::id(), N.fetch_add(1, Ordering::Relaxed)));
-        match OpenOptions::new().write(true).create_new(true).open(&tmp) {
-            Ok(f) => return Ok((tmp, f)),
-            Err(e) if e.kind() == io::ErrorKind::AlreadyExists => continue,
-            Err(e) => return Err(e),
-        }
-    }
-    Err(io::Error::new(io::ErrorKind::AlreadyExists, format!("no free temp file name in {}", dir.display())))
-}
-
-/// Write a temp file next to `path` with what `fill` writes, synced to disk when `sync`. On
-/// failure the temp file is removed. Returns its path and length.
-fn write_temp(path: &Path, sync: bool, fill: &mut dyn FnMut(&mut dyn Write) -> io::Result<()>) -> io::Result<(PathBuf, u64)> {
-    let (tmp, file) = create_temp(path)?;
-    let r = (|| {
-        let limit = FAIL_AFTER.with(Cell::get);
-        let mut w = Limited { inner: io::BufWriter::with_capacity(1 << 20, file), n: 0, limit };
-        fill(&mut w)?;
-        w.flush()?;
-        let n = w.n;
-        let f = w.inner.into_inner().map_err(|e| e.into_error())?;
-        if sync {
-            sync_file(&f)?;
-        }
-        Ok(n)
-    })();
-    match r {
-        Ok(n) => Ok((tmp, n)),
-        Err(e) => {
-            let _ = fs::remove_file(&tmp);
-            Err(e)
-        }
     }
 }
 
@@ -172,77 +124,105 @@ pub fn write_atomic_nosync(path: &Path, data: &[u8]) -> io::Result<()> {
 
 /// Temp file (synced when `sync`) renamed over `path`, then the folder synced when `sync`.
 fn replace_with(path: &Path, sync: bool, fill: &mut dyn FnMut(&mut dyn Write) -> io::Result<()>) -> io::Result<u64> {
-    let (tmp, n) = write_temp(path, sync, fill)?;
-    if let Err(e) = fs::rename(&tmp, path) {
-        let _ = fs::remove_file(&tmp);
-        return Err(e);
-    }
-    if sync {
-        sync_dir(parent_of(path));
-    }
+    let filesystem = ReplacementFs { sync, stage: RefCell::new(None) };
+    replace_with_fs(&filesystem, path, fill)
+}
+
+fn replace_with_fs(filesystem: &dyn craft_atomic::AtomicFs, path: &Path, fill: &mut dyn FnMut(&mut dyn Write) -> io::Result<()>) -> io::Result<u64> {
+    let mut n = 0;
+    craft_atomic::WriteOptions::default().atomic_write_with_custom(filesystem, craft_atomic::RenameRetry::platform(), path, |file| {
+        let limit = FAIL_AFTER.with(Cell::get);
+        let mut writer = Limited { inner: io::BufWriter::with_capacity(1 << 20, file), n: 0, limit };
+        fill(&mut writer)?;
+        writer.flush()?;
+        n = writer.n;
+        Ok(())
+    })?;
     Ok(n)
 }
 
+struct ReplacementFs {
+    sync: bool,
+    stage: RefCell<Option<PathBuf>>,
+}
+
+impl craft_atomic::AtomicFs for ReplacementFs {
+    fn create_new(&self, path: &Path, permissions: craft_atomic::NewFilePermissions) -> io::Result<File> {
+        let file = craft_atomic::AtomicFs::create_new(&craft_atomic::RealFs, path, permissions)?;
+        if self.stage.borrow().is_none() {
+            *self.stage.borrow_mut() = Some(path.to_path_buf());
+        }
+        Ok(file)
+    }
+    fn sync(&self, file: &File) -> io::Result<()> {
+        if self.sync {
+            SYNCS.with(|count| count.set(count.get() + 1));
+            craft_atomic::AtomicFs::sync(&craft_atomic::RealFs, file)
+        } else {
+            Ok(())
+        }
+    }
+    fn rename(&self, from: &Path, to: &Path) -> io::Result<()> {
+        craft_atomic::AtomicFs::rename(&craft_atomic::RealFs, from, to)
+    }
+    fn hard_link(&self, from: &Path, to: &Path) -> io::Result<()> {
+        craft_atomic::AtomicFs::hard_link(&craft_atomic::RealFs, from, to)
+    }
+    fn remove(&self, path: &Path) -> io::Result<()> {
+        craft_atomic::AtomicFs::remove(&craft_atomic::RealFs, path)
+    }
+    fn sync_dir(&self, dir: &Path) -> io::Result<()> {
+        if self.sync {
+            SYNCS.with(|count| count.set(count.get() + 1));
+            craft_atomic::AtomicFs::sync_dir(&craft_atomic::RealFs, dir)
+        } else {
+            Ok(())
+        }
+    }
+    fn set_permissions(&self, file: &File, permissions: fs::Permissions) -> io::Result<()> {
+        craft_atomic::AtomicFs::set_permissions(&craft_atomic::RealFs, file, permissions)
+    }
+}
+
 /// Write `data` as the new file `path`: never replaces an existing file (`AlreadyExists`), and
-/// the file only appears once it is complete, synced and read back identical.
+/// the staged file is synced and read back before publication. On volumes without hard links,
+/// the exclusive-copy fallback may expose a partially copied file during publication.
 pub fn write_new(path: &Path, data: &[u8]) -> io::Result<()> {
     write_new_unique(&mut std::iter::once(path.to_path_buf()), data).map(|_| ())
 }
 
 /// [`write_new`] under the first free name of `candidates` (all in the same folder, e.g.
-/// `IMG_1.dng`, `IMG_1-2.dng`, …): the file is written once and then given the first name that
-/// is not taken. Returns that name; `AlreadyExists` when every candidate is taken.
+/// `IMG_1.dng`, `IMG_1-2.dng`, …): attempts each name until one is available, without replacing
+/// another file. Returns that name; `AlreadyExists` when every candidate is taken.
 pub fn write_new_unique(candidates: &mut dyn Iterator<Item = PathBuf>, data: &[u8]) -> io::Result<PathBuf> {
-    let mut candidates = candidates.peekable();
-    let Some(first) = candidates.peek().cloned() else {
-        return Err(io::Error::new(io::ErrorKind::InvalidInput, "no file name to write"));
-    };
-    let (tmp, _) = write_temp(&first, true, &mut |w| w.write_all(data))?;
-    let r = (|| {
-        // Kept (issue #134 point 4): these files replace raws (Convert / Copy as DNG) or become
-        // library photos (merges). On a local disk the read usually comes from the cache, but on a
-        // network volume it can go back to the server, and next to encoding a DNG it costs little.
-        if !same_content(&tmp, data)? {
-            return Err(io::Error::other("the written file reads back different (failing drive or connection?)"));
+    let mut first = None;
+    for path in candidates.take(100_000) {
+        if first.is_none() {
+            first = Some(path.clone());
         }
-        for path in candidates.by_ref().take(100_000) {
-            match publish_new(&tmp, &path) {
-                Ok(()) => {
-                    sync_dir(parent_of(&path));
-                    return Ok(path);
-                }
-                Err(e) if e.kind() == io::ErrorKind::AlreadyExists => continue,
-                Err(e) => return Err(e),
+        let filesystem = ReplacementFs { sync: true, stage: RefCell::new(None) };
+        let result = craft_atomic::WriteOptions::default().write_new_with_custom(&filesystem, &path, |file| {
+            let mut writer = Limited { inner: &mut *file, n: 0, limit: FAIL_AFTER.with(Cell::get) };
+            writer.write_all(data)?;
+            writer.flush()?;
+            craft_atomic::AtomicFs::sync(&filesystem, file)?;
+            let stage = filesystem.stage.borrow();
+            let stage = stage.as_deref().ok_or_else(|| io::Error::other("missing staging file"))?;
+            if !same_content(stage, data)? {
+                return Err(io::Error::other("the written file reads back different (failing drive or connection?)"));
             }
+            Ok(())
+        });
+        match result {
+            Ok(()) => return Ok(path),
+            Err(error) if error.kind() == io::ErrorKind::AlreadyExists => continue,
+            Err(error) => return Err(error),
         }
-        Err(io::Error::new(io::ErrorKind::AlreadyExists, format!("{}: no free file name", first.display())))
-    })();
-    // after a hard link the temp name is a second name of the new file; after a rename it's gone
-    let _ = fs::remove_file(&tmp);
-    r
-}
-
-/// Give the complete temp file `tmp` the name `path`, unless that is taken.
-fn publish_new(tmp: &Path, path: &Path) -> io::Result<()> {
-    match fs::hard_link(tmp, path) {
-        Ok(()) => Ok(()),
-        Err(e) if e.kind() == io::ErrorKind::AlreadyExists => Err(e),
-        // no hard links on this volume (FAT/exFAT, some shares)
-        Err(_) => publish_new_by_rename(tmp, path, &|| {}),
     }
-}
-
-/// Fallback of [`publish_new`]: reserve the name with an exclusive create (atomic, so a file that
-/// appears at the same time is never replaced), then rename the complete temp file over our own
-/// empty placeholder. `before_claim` runs just before the name is claimed (a test hook).
-fn publish_new_by_rename(tmp: &Path, path: &Path, before_claim: &dyn Fn()) -> io::Result<()> {
-    before_claim();
-    OpenOptions::new().write(true).create_new(true).open(path)?;
-    if let Err(e) = fs::rename(tmp, path) {
-        let _ = fs::remove_file(path);
-        return Err(e);
+    match first {
+        Some(path) => Err(io::Error::new(io::ErrorKind::AlreadyExists, format!("{}: no free file name", path.display()))),
+        None => Err(io::Error::new(io::ErrorKind::InvalidInput, "no file name to write")),
     }
-    Ok(())
 }
 
 /// Does the file at `path` hold exactly `data`?
@@ -341,6 +321,64 @@ fn same_file_id(a: (u64, u64), b: (u64, u64), strict: bool) -> io::Result<bool> 
 mod tests {
     use super::*;
 
+    struct FaultFs(&'static str);
+
+    impl craft_atomic::AtomicFs for FaultFs {
+        fn create_new(&self, path: &Path, permissions: craft_atomic::NewFilePermissions) -> io::Result<File> {
+            craft_atomic::AtomicFs::create_new(&craft_atomic::RealFs, path, permissions)
+        }
+        fn sync(&self, file: &File) -> io::Result<()> {
+            if self.0 == "sync" { Err(io::Error::other("injected sync failure")) } else { craft_atomic::AtomicFs::sync(&craft_atomic::RealFs, file) }
+        }
+        fn rename(&self, from: &Path, to: &Path) -> io::Result<()> {
+            if self.0 == "rename" {
+                Err(io::Error::other("injected rename failure"))
+            } else {
+                craft_atomic::AtomicFs::rename(&craft_atomic::RealFs, from, to)
+            }
+        }
+        fn hard_link(&self, from: &Path, to: &Path) -> io::Result<()> {
+            if self.0 == "race" {
+                fs::write(to, b"other writer")?;
+                return Err(io::Error::other("hard links unavailable"));
+            }
+            craft_atomic::AtomicFs::hard_link(&craft_atomic::RealFs, from, to)
+        }
+        fn remove(&self, path: &Path) -> io::Result<()> {
+            craft_atomic::AtomicFs::remove(&craft_atomic::RealFs, path)
+        }
+        fn sync_dir(&self, dir: &Path) -> io::Result<()> {
+            if self.0 == "directory" {
+                Err(io::Error::other("injected directory failure"))
+            } else {
+                craft_atomic::AtomicFs::sync_dir(&craft_atomic::RealFs, dir)
+            }
+        }
+        fn set_permissions(&self, file: &File, permissions: fs::Permissions) -> io::Result<()> {
+            craft_atomic::AtomicFs::set_permissions(&craft_atomic::RealFs, file, permissions)
+        }
+    }
+
+    #[test]
+    fn interrupted_replacements_never_publish_torn_content() {
+        let dir = temp("fault-points");
+        let path = dir.join("photo.jpg");
+        for fault in ["sync", "rename", "directory", "none"] {
+            fs::write(&path, b"old content").unwrap();
+            let result = replace_with_fs(&FaultFs(fault), &path, &mut |writer| writer.write_all(b"complete new content"));
+            let actual = fs::read(&path).unwrap();
+            assert!(actual == b"old content" || actual == b"complete new content", "{fault}");
+            if fault == "sync" || fault == "rename" {
+                assert!(result.is_err());
+                assert_eq!(actual, b"old content");
+            } else {
+                assert!(result.is_ok());
+                assert_eq!(actual, b"complete new content");
+            }
+        }
+        let _ = fs::remove_dir_all(dir);
+    }
+
     fn temp(tag: &str) -> PathBuf {
         let d = std::env::temp_dir().join(format!("lc-safe-file-{tag}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&d);
@@ -357,16 +395,13 @@ mod tests {
     #[test]
     fn fallback_publish_never_replaces_a_file_that_appears_at_the_same_time() {
         let d = temp("nolink-race");
-        let tmp = d.join(".tmp-new");
         let dest = d.join("IMG_1.dng");
-        fs::write(&tmp, b"new").unwrap();
-        let e = publish_new_by_rename(&tmp, &dest, &|| fs::write(&dest, b"other writer").unwrap()).unwrap_err();
+        let e = craft_atomic::WriteOptions::default().write_new_custom(&FaultFs("race"), &dest, b"new").unwrap_err();
         assert_eq!(e.kind(), io::ErrorKind::AlreadyExists);
         assert_eq!(fs::read(&dest).unwrap(), b"other writer");
         fs::remove_file(&dest).unwrap();
-        publish_new_by_rename(&tmp, &dest, &|| {}).unwrap();
+        write_new(&dest, b"new").unwrap();
         assert_eq!(fs::read(&dest).unwrap(), b"new");
-        assert!(!tmp.exists());
         let _ = fs::remove_dir_all(&d);
     }
 
