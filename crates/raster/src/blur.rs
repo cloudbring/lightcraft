@@ -9,6 +9,34 @@ use crate::{Image, par_rows};
 /// radius of billions of pixels, i.e. a hung render, where it isn't).
 pub const MAX_SIGMA: f32 = 65_536.0;
 
+/// A normalized sampled Gaussian whose discrete variance is `sigma²`.
+///
+/// Returns `None` for non-finite, non-positive or greater-than-33-pixel sigmas, bounding its cost.
+pub fn variance_exact_kernel(sigma: f32) -> Option<Vec<f32>> {
+    if !sigma.is_finite() || sigma <= 0.0 || sigma > 33.0 {
+        return None;
+    }
+    let half = (3.0 * sigma).ceil() as i32;
+    let target = f64::from(sigma).powi(2);
+    let sample = |width: f64| {
+        let mut weights: Vec<f64> = (-half..=half).map(|offset| (-f64::from(offset * offset) / (2.0 * width * width)).exp()).collect();
+        let sum: f64 = weights.iter().sum();
+        weights.iter_mut().for_each(|weight| *weight /= sum);
+        weights
+    };
+    let (mut low, mut high) = (f64::from(sigma) * 0.01, f64::from(sigma) * 2.0 + 1.0);
+    for _ in 0..48 {
+        let middle = (low + high) * 0.5;
+        let variance: f64 = sample(middle).iter().enumerate().map(|(index, weight)| weight * (index as f64 - f64::from(half)).powi(2)).sum();
+        if variance < target {
+            low = middle;
+        } else {
+            high = middle;
+        }
+    }
+    Some(sample((low + high) * 0.5).into_iter().map(|weight| weight as f32).collect())
+}
+
 /// Box radii approximating a Gaussian of `sigma` with 3 passes (Kovesi / Wells). A sigma that is
 /// not a number counts as 0 (no blur); one above [`MAX_SIGMA`] (infinity too) as `MAX_SIGMA`.
 pub fn box_radii(sigma: f32) -> [usize; 3] {
@@ -128,6 +156,21 @@ pub fn gaussian<T: Pixel>(img: &Image<T>, sigma: f32) -> Image<T> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn exact_kernel_has_requested_variance() {
+        for sigma in [0.3f32, 0.5, 0.7, 1.0, 1.5, 2.0, 4.0, 8.0, 16.0, 33.0] {
+            let kernel = super::variance_exact_kernel(sigma).expect("valid sigma");
+            let half = kernel.len() / 2;
+            let sum: f32 = kernel.iter().sum();
+            let variance: f32 = kernel.iter().enumerate().map(|(index, weight)| weight * (index as f32 - half as f32).powi(2)).sum();
+            assert!((sum - 1.0).abs() < 1e-5, "sigma {sigma}: sum {sum}");
+            assert!((variance / sigma.powi(2) - 1.0).abs() < 0.01, "sigma {sigma}: variance {variance}");
+        }
+        for sigma in [0.0, -1.0, f32::NAN, f32::INFINITY, 33.01] {
+            assert!(super::variance_exact_kernel(sigma).is_none());
+        }
+    }
+
     /// The box radii of the formula as it was, for the check below.
     fn box_radii_before(sigma: f32) -> [usize; 3] {
         let n = 3.0f32;
