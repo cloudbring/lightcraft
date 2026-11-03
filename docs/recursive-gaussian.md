@@ -8,9 +8,19 @@ Lightroom rendering parity. Measurements below are from November 3, 2026.
 
 `crates/raster/src/blur.rs::gaussian` retains the public generic image API. Built-in
 `f32`, RGB and RGBA floating pixels use f64 states throughout both line passes.
-Rows and transposed columns are independent rayon jobs; 32-pixel transpose tiles
-avoid long strided reads. Below sigma 2.5, the existing variance-exact sampled
-kernel helper is used, with f64 accumulation and clamp-edge samples.
+Eight independent rows are interleaved in each worker's forward and reverse
+recurrences. The column pass walks eight adjacent columns together, using safe,
+disjoint mutable row slices assigned to worker stripes; neither native pass
+transposes the image. The f64 forward buffer is reused between blocks within
+each worker job, with no per-line allocations. Release aarch64 assembly contains
+packed NEON `fmul.2d`, `fadd.2d` and f32-to-f64 conversions, not scalar-only
+dependency chains. No SIMD dependency or unsafe code is added.
+
+Below sigma 2.5, the existing variance-exact sampled kernel helper is used, with
+f64 accumulation and clamp-edge samples. Both axes share a 64-row tiled working
+buffer, avoiding a full-image intermediate; row scratch is reused per worker.
+The seven-tap horizontal window is unrolled while retaining tap summation order.
+Custom pixels still use their existing line hook and transpose-based fallback.
 
 For sigma at least 2.5, use Young, van Vliet and van Ginkel, *Recursive Gabor
 Filtering*, IEEE Transactions on Signal Processing 50(11), 2798–2805 (2002):
@@ -113,27 +123,58 @@ for process-specific parity bounds and the pending Nehab recursive WGSL port.
 
 6000 × 4000 (24 MP) scalar plane, release build, `RAYON_NUM_THREADS=1`, minimum
 of nine runs per case. Wall and process CPU time are both measured; allocation
-and transposes are included. Supplied pre-change baseline: 34.4 / 97.1 / 109.6 ms.
+and all working buffers are included. Supplied pre-change box baseline:
+34.4 / 97.1 / 109.6 ms. Second-pass measurements use an Apple M6 and the same
+rustup release toolchain and benchmark; the scalar V3 rerun is before these edits.
 
-| Sigma | Supplied before ms | Legacy rerun wall ms | V3 wall ms | V3 process CPU ms |
-|---:|---:|---:|---:|---:|
-| 1 | 34.4 | 34.3 | 79.2 | 79.2 |
-| 8 | 97.1 | 96.8 | 244.8 | 244.7 |
-| 64 | 109.6 | 106.4 | 236.3 | 236.2 |
+| Sigma | Pass 1 reported ms | Scalar V3 rerun ms | Boxes rerun ms | Interleaved V3 wall ms | Interleaved V3 CPU ms |
+|---:|---:|---:|---:|---:|---:|
+| 1 | 79.2 | 68.1 | 30.9 | 33.6 | 33.6 |
+| 8 | 244.8 | 246.4 | 87.9 | 70.5 | 70.4 |
+| 64 | 236.3 | 251.9 | 101.6 | 70.2 | 70.2 |
 
-This is a **2.16–2.52× slowdown** versus the supplied baseline, not a speedup.
-The f64 forward/reverse recurrence and transposes cost more than vectorized boxes;
-radius-independent runtime and corrected variance are the tradeoff. The 24 MP
-RGB sigma-4 result is 352.4 ms wall / 350.3 ms process CPU.
+All requested absolute budgets (35 / 100 / 110 ms) pass. The interleaved
+implementation is 2.03–3.59× faster than the scalar V3 rerun and faster than
+boxes at sigma 8 and 64. At sigma 1, the same-run boxes remain 2.7 ms faster;
+the variance-exact filter is below the supplied box baseline and requested cap.
+The 24 MP RGB sigma-4 rerun improves from 380.5 ms wall / 375.1 ms CPU to
+160.0 ms wall / 160.0 ms CPU.
+
+The retained scalar line implementation provides a pass-1 reference through a
+custom test pixel, exercising the original two-transpose image path. Native
+plane, RGB and RGBA results are **bit-identical (maximum delta 0)** across
+sampled and recursive sigmas, HDR values, signed zero, tiny images, odd/tail
+dimensions, 4097-pixel lines, 64-row FIR tile boundaries and 1/2/4/16 worker
+stripes. The pass-1 variance, DC, border, symmetry and shape bounds are unchanged.
 
 ```sh
-RAYON_NUM_THREADS=1 CARGO_TARGET_DIR="$PWD/target-176" \
+export PATH="$(dirname "$(rustup which cargo)"):$PATH"
+RAYON_NUM_THREADS=1 CARGO_TARGET_DIR="$PWD/target-176b" \
   cargo run --release -p lightcraft-raster --example blur_bench
-CARGO_TARGET_DIR="$PWD/target-176" \
+CARGO_TARGET_DIR="$PWD/target-176b" \
   cargo test -p lightcraft-raster -p lightcraft-pipeline
 ```
 
-## Validation
+## Pass-2 validation
+
+The rustup stable toolchain, `CARGO_INCREMENTAL=0` and worktree-local
+`CARGO_TARGET_DIR=target-176b` are used throughout; the target directory is
+removed after validation. No processing version, coefficient, fixture or
+acceptance threshold changes in this pass.
+
+- Raster and pipeline tests: 263 passed, 0 failed, 3 ignored.
+- Raster without the parallel feature: 36 passed, 0 failed.
+- Raster/pipeline clippy `--all-targets -- -D warnings`, fmt and diff checks pass.
+- Release accuracy tests: 6 passed, 0 failed; all original bounds are unchanged.
+- Assembly inspection confirms packed f64 recurrence independently of the debug
+  test build.
+- `cargo xtask ci`: all eight gates pass (fmt, workspace clippy, HEIF, tests,
+  parity, layers, assets and wasm), with 5,604 workspace tests passed, 0 failed
+  and 43 ignored. Its 152 runtime-skipped checks (141 corpus, 8 model, 2 fonts,
+  1 GPU) are not claims of verification. The wasm build retains eight existing
+  UI warnings; no new warnings are introduced.
+
+## Pass-1 validation
 
 Native and wasm checks use the rustup stable toolchain (rustc/cargo 1.99.0),
 with `CARGO_TARGET_DIR` set to this worktree's `target-176` throughout.

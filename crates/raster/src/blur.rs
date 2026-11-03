@@ -5,6 +5,8 @@
 use crate::resample::Pixel;
 use crate::{Image, par_rows};
 
+mod interleaved;
+
 /// The largest blur sigma (pixels) the box radii are made for. A box wider than any image (the
 /// encoders' limit is 65535 px) blurs to the same flat result, and a larger sigma made the box
 /// width's square overflow (from about 23 170 px: a panic where overflow is checked, a garbage
@@ -297,6 +299,9 @@ pub fn gaussian<T: Pixel>(img: &Image<T>, sigma: f32) -> Image<T> {
     }
     let sigma = sigma.min(MAX_SIGMA).min((img.width.max(img.height) as f32 * 2.0).max(1.0));
     let filter = Gaussian::new(sigma);
+    if let Some(output) = T::gaussian_image(img, &filter) {
+        return output;
+    }
     let mut horizontal = img.clone();
     par_rows(&mut horizontal.data, img.width, |_, row| T::gaussian_line(row, &filter));
     let mut transposed = Image::<T>::new(img.height, img.width);

@@ -3,6 +3,107 @@ use crate::{Plane, Rgb32f};
 
 const SIGMAS: [f32; 9] = [0.5, 1.0, 2.0, 2.5, 4.0, 8.0, 16.0, 32.0, 64.0];
 
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+struct Scalar<T>(T);
+
+impl<T: Pixel> Pixel for Scalar<T> {
+    fn zero() -> Self {
+        Self(T::zero())
+    }
+
+    fn madd(self, other: Self, weight: f32) -> Self {
+        Self(self.0.madd(other.0, weight))
+    }
+
+    fn gaussian_line(line: &mut [Self], filter: &Gaussian) {
+        let mut pixels: Vec<T> = line.iter().map(|pixel| pixel.0).collect();
+        T::gaussian_line(&mut pixels, filter);
+        for (pixel, value) in line.iter_mut().zip(pixels) {
+            pixel.0 = value;
+        }
+    }
+}
+
+trait PixelBits {
+    type Bits: std::fmt::Debug + PartialEq;
+    fn bits(self) -> Self::Bits;
+}
+
+impl PixelBits for f32 {
+    type Bits = u32;
+    fn bits(self) -> u32 {
+        self.to_bits()
+    }
+}
+
+impl<const CHANNELS: usize> PixelBits for [f32; CHANNELS] {
+    type Bits = [u32; CHANNELS];
+    fn bits(self) -> Self::Bits {
+        self.map(f32::to_bits)
+    }
+}
+
+fn assert_scalar_identical<T: Pixel + PixelBits>(input: &Image<T>, sigma: f32) {
+    let scalar = Image { width: input.width, height: input.height, data: input.data.iter().copied().map(Scalar).collect() };
+    let expected: Vec<_> = gaussian(&scalar, sigma).data.into_iter().map(|pixel| pixel.0.bits()).collect();
+    let actual: Vec<_> = gaussian(input, sigma).data.into_iter().map(PixelBits::bits).collect();
+    assert_eq!(actual, expected, "{}x{}, sigma {sigma}", input.width, input.height);
+}
+
+#[test]
+fn interleaved_matches_scalar_for_tails_channels_and_boundaries() {
+    for (width, height) in [
+        (1, 1),
+        (1, 17),
+        (17, 1),
+        (2, 3),
+        (3, 2),
+        (7, 9),
+        (8, 8),
+        (9, 7),
+        (15, 17),
+        (16, 16),
+        (17, 15),
+        (33, 31),
+        (65, 97),
+        (257, 131),
+        (4097, 17),
+        (17, 4097),
+    ] {
+        let input = Plane::from_fn(width, height, |column, row| ((column * 127 + row * 37 + 19) % 257) as f32 / 17.0 - 3.25);
+        let rgb = input.map(|value| [value, value * -0.7, value * 2.5]);
+        let rgba = input.map(|value| [value, value * -0.7, value * 2.5, value * 0.01]);
+        for sigma in SIGMAS.into_iter().chain([0.01, 0.7, 1.3, 2.4, 128.0, f32::INFINITY]) {
+            assert_scalar_identical(&input, sigma);
+            assert_scalar_identical(&rgb, sigma);
+            assert_scalar_identical(&rgba, sigma);
+        }
+    }
+}
+
+#[test]
+fn interleaved_keeps_hdr_and_signed_zero_bits() {
+    let values = [-0.0_f32, 0.0, f32::MIN_POSITIVE, -1e-25, 1e25, -1e25, 0.7, -3.25, 17.0];
+    let input = Plane::from_fn(17, 129, |column, row| values[(column * 7 + row * 13) % values.len()]);
+    for sigma in SIGMAS {
+        assert_scalar_identical(&input, sigma);
+    }
+}
+
+#[cfg(feature = "parallel")]
+#[test]
+fn interleaved_matches_scalar_across_worker_stripes() {
+    let input = Plane::from_fn(139, 67, |column, row| ((column * 17 + row * 43) % 257) as f32 / 257.0);
+    for workers in [1, 2, 4, 16] {
+        let pool = rayon::ThreadPoolBuilder::new().num_threads(workers).build().expect("test pool");
+        pool.install(|| {
+            for sigma in SIGMAS {
+                assert_scalar_identical(&input, sigma);
+            }
+        });
+    }
+}
+
 #[test]
 fn impulse_variance_gain_symmetry_and_shape() {
     for sigma in SIGMAS {
