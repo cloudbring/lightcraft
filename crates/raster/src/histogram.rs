@@ -15,6 +15,9 @@ pub struct Histogram {
     pub b: Vec<u32>,
     pub luma: Vec<u32>,
     pub total: u32,
+    /// Any-channel HDR overflow count; absent in legacy histograms.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub above_sdr_count: Option<u32>,
     /// HDR histograms: the first bin above SDR white, and the stops above SDR white the last bin
     /// reaches. `None` for SDR histograms (every bin is SDR).
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -54,7 +57,7 @@ impl Histogram {
     pub const HDR_FROM: usize = Self::BINS / 2;
 
     fn empty(hdr: Option<HdrBins>) -> Histogram {
-        Histogram { r: vec![0; 256], g: vec![0; 256], b: vec![0; 256], luma: vec![0; 256], total: 0, hdr }
+        Histogram { r: vec![0; 256], g: vec![0; 256], b: vec![0; 256], luma: vec![0; 256], total: 0, above_sdr_count: hdr.map(|_| 0), hdr }
     }
 
     /// Histogram of linear RGB samples (1 = SDR white) reaching `stops` stops above SDR white.
@@ -64,6 +67,9 @@ impl Histogram {
         let mut h = Self::empty(Some(bins));
         let step = (samples.len() / 1_000_000).max(1);
         for c in samples.iter().step_by(step) {
+            if c.iter().any(|&value| value > 1.0) {
+                *h.above_sdr_count.get_or_insert(0) += 1;
+            }
             h.r[bins.bin(c[0])] += 1;
             h.g[bins.bin(c[1])] += 1;
             h.b[bins.bin(c[2])] += 1;
@@ -79,6 +85,9 @@ impl Histogram {
         let mut h = Self::empty(Some(bins));
         let step = (px.len() / 1_000_000).max(1);
         for [r, g, b, l] in px.step_by(step) {
+            if [r, g, b].iter().any(|&value| (value as usize) >= bins.from.clamp(2, Self::BINS - 1)) {
+                *h.above_sdr_count.get_or_insert(0) += 1;
+            }
             h.r[r as usize] += 1;
             h.g[g as usize] += 1;
             h.b[b as usize] += 1;
@@ -89,15 +98,18 @@ impl Histogram {
     }
 
     /// The histogram as flat words (to cross a worker boundary): r, g, b, luma (256 each), the
-    /// total, then the first HDR bin (0: SDR) and the HDR stops as `f32` bits.
+    /// total, the first HDR bin (0: SDR), HDR stops as `f32` bits, and optional overflow count.
     pub fn to_words(&self) -> Vec<u32> {
-        let mut w = Vec::with_capacity(4 * Self::BINS + 3);
+        let mut w = Vec::with_capacity(4 * Self::BINS + 4);
         for ch in [&self.r, &self.g, &self.b, &self.luma] {
             w.extend(ch.iter().copied().chain(std::iter::repeat(0)).take(Self::BINS));
         }
         w.push(self.total);
         let (from, stops) = self.hdr.map_or((0, 0.0), |b| (b.from as u32, b.stops));
         w.extend([from, stops.to_bits()]);
+        if let Some(count) = self.above_sdr_count {
+            w.push(count);
+        }
         w
     }
 
@@ -105,7 +117,7 @@ impl Histogram {
     /// for anything malformed.
     pub fn from_words(w: &[u32]) -> Option<Histogram> {
         let n = Self::BINS;
-        if w.len() != 4 * n + 1 && w.len() != 4 * n + 3 {
+        if w.len() != 4 * n + 1 && w.len() != 4 * n + 3 && w.len() != 4 * n + 4 {
             return None;
         }
         let ch = |k: usize| w.get(k * n..(k + 1) * n).map(<[u32]>::to_vec);
@@ -116,17 +128,19 @@ impl Histogram {
             }
             _ => None,
         };
-        Some(Histogram { r: ch(0)?, g: ch(1)?, b: ch(2)?, luma: ch(3)?, total: *w.get(4 * n)?, hdr })
+        let total = *w.get(4 * n)?;
+        let above_sdr_count = if hdr.is_some() { w.get(4 * n + 3).copied().filter(|&count| count <= total) } else { None };
+        Some(Histogram { r: ch(0)?, g: ch(1)?, b: ch(2)?, luma: ch(3)?, total, above_sdr_count, hdr })
     }
 
-    /// Fraction of pixels above SDR white in any channel (0 for SDR histograms).
+    /// Fraction above SDR white in any channel (0 for SDR); legacy data uses the largest marginal as a lower bound.
     pub fn above_sdr(&self) -> f32 {
         let Some(b) = self.hdr else { return 0.0 };
         if self.total == 0 {
             return 0.0;
         }
         let over = |v: &[u32]| v.iter().skip(b.from).sum::<u32>();
-        over(&self.r).max(over(&self.g)).max(over(&self.b)) as f32 / self.total as f32
+        self.above_sdr_count.unwrap_or_else(|| over(&self.r).max(over(&self.g)).max(over(&self.b))) as f32 / self.total as f32
     }
 
     pub fn of_srgb8(img: &Rgba8) -> Histogram {
@@ -188,6 +202,16 @@ mod tests {
     use super::*;
 
     #[test]
+    fn hdr_overflow_counts_disjoint_channels() {
+        let pixels = [[2.0, 0.0, 0.0], [0.0, 0.0, 2.0]];
+        let histogram = Histogram::of_hdr(&pixels, 4.0);
+        assert_eq!(histogram.above_sdr(), 1.0);
+        let bins = histogram.hdr.unwrap();
+        let encoded = pixels.into_iter().map(|pixel| [bins.bin(pixel[0]) as u8, bins.bin(pixel[1]) as u8, bins.bin(pixel[2]) as u8, 0]);
+        assert_eq!(Histogram::of_bins(encoded, bins).above_sdr(), 1.0);
+    }
+
+    #[test]
     fn counts_and_stats() {
         let img = Rgba8::from_fn(10, 10, |x, _| if x < 5 { [0, 0, 0, 255] } else { [255, 255, 255, 255] });
         let h = Histogram::of_srgb8(&img);
@@ -242,6 +266,9 @@ mod tests {
         let sdr = Histogram::of_srgb8(&img);
         assert_eq!(Histogram::from_words(&sdr.to_words()), Some(sdr.clone()));
         let hdr = Histogram::of_hdr(&[[0.5, 2.0, 9.0]], 4.0);
+        let legacy_hdr = Histogram::from_words(&hdr.to_words()[..1027]).unwrap();
+        assert_eq!(legacy_hdr.above_sdr_count, None);
+        assert_eq!(legacy_hdr.above_sdr(), 1.0);
         assert_eq!(Histogram::from_words(&hdr.to_words()), Some(hdr));
         // the older layout (no HDR words) is an SDR histogram
         assert_eq!(Histogram::from_words(&sdr.to_words()[..1025]), Some(sdr.clone()));
