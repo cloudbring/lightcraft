@@ -1184,7 +1184,7 @@ dependencies = [
 [[package]]
 name = "craft-blur"
 version = "0.1.0"
-source = "git+https://github.com/cloudbring/craft-libs?branch=algo%2F2-craft-blur#75bb40cf0c06b7e046874f389376acbfd86915ab"
+source = "git+https://github.com/cloudbring/craft-libs?branch=algo%2F2-craft-blur-midband#d98d0605bb63a0862330f3885605ec1def323643"
 
 [[package]]
 name = "craft-crw"

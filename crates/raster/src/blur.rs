@@ -1,13 +1,10 @@
-//! Gaussian blur via craft-blur, with the original V3 recurrence retained at sigma 2.5–8.
-//! craft-blur samples that guard band, which would change existing V3 renders.
+//! Gaussian blur via craft-blur's bit-identical V3 RecursiveRaw policy at every sigma.
 //! [`gaussian_box`] preserves the legacy process and the GPU's three-box approximation.
 
 use crate::resample::Pixel;
 use crate::{Image, par_rows};
 
 use craft_blur::{Cancel, Edge, Quality, Scratch, Shape};
-
-mod compatibility;
 
 /// The largest blur sigma (pixels) the box radii are made for. A box wider than any image (the
 /// encoders' limit is 65535 px) blurs to the same flat result, and a larger sigma made the box
@@ -132,19 +129,15 @@ pub fn gaussian_box<T: Pixel>(img: &Image<T>, sigma: f32) -> Image<T> {
     a
 }
 
-/// Precomputed Gaussian, retaining the V3 response where craft-blur's quality guard differs.
+/// Precomputed Gaussian preserving the V3 response across the entire sigma range.
 pub struct Gaussian {
     sigma: f32,
-    shared: Option<craft_blur::Gaussian>,
-    compatibility: Option<RecursiveCompatibility>,
+    shared: craft_blur::Gaussian,
 }
 
 impl Gaussian {
     fn new(sigma: f32) -> Result<Self, craft_blur::Error> {
-        if (2.5..8.0).contains(&sigma) {
-            return Ok(Self { sigma, shared: None, compatibility: Some(RecursiveCompatibility::new(sigma)) });
-        }
-        Ok(Self { sigma, shared: Some(craft_blur::Gaussian::new(sigma, Quality::Recursive)?), compatibility: None })
+        Ok(Self { sigma, shared: craft_blur::Gaussian::new(sigma, Quality::RecursiveRaw)? })
     }
 
     /// Compatibility implementation for custom pixel types that retain legacy box filtering.
@@ -162,15 +155,11 @@ impl Gaussian {
         widen: impl Fn(T) -> [f64; CHANNELS],
         narrow: impl Fn([f64; CHANNELS]) -> T,
     ) {
-        if let Some(compatibility) = &self.compatibility {
-            compatibility.filter(line, widen, narrow);
-        } else if let Some(filter) = &self.shared {
-            let Ok(shape) = Shape::new(line.len(), 1, CHANNELS) else { return };
-            let mut pixels: Vec<[f32; CHANNELS]> = line.iter().map(|&pixel| widen(pixel).map(|value| value as f32)).collect();
-            if filter.filter_rows(pixels.as_flattened_mut(), shape, Edge::Clamp, &mut Scratch::default(), Cancel::Never).is_ok() {
-                for (pixel, value) in line.iter_mut().zip(pixels) {
-                    *pixel = narrow(value.map(f64::from));
-                }
+        let Ok(shape) = Shape::new(line.len(), 1, CHANNELS) else { return };
+        let mut pixels: Vec<[f32; CHANNELS]> = line.iter().map(|&pixel| widen(pixel).map(|value| value as f32)).collect();
+        if self.shared.filter_rows(pixels.as_flattened_mut(), shape, Edge::Clamp, &mut Scratch::default(), Cancel::Never).is_ok() {
+            for (pixel, value) in line.iter_mut().zip(pixels) {
+                *pixel = narrow(value.map(f64::from));
             }
         }
     }
@@ -179,13 +168,8 @@ impl Gaussian {
         &self,
         image: &Image<T>,
         flatten: impl Fn(&mut [T]) -> &mut [f32] + Sync,
-        widen: impl Fn(T) -> [f64; CHANNELS] + Copy + Send + Sync,
-        narrow: impl Fn([f64; CHANNELS]) -> T + Copy + Send + Sync,
     ) -> Option<Image<T>> {
-        if let Some(compatibility) = &self.compatibility {
-            return Some(compatibility.filter_image(image, widen, narrow));
-        }
-        let filter = self.shared.as_ref()?;
+        let filter = &self.shared;
         let shape = Shape::new(image.width, image.height, CHANNELS).ok()?;
         #[cfg(feature = "parallel")]
         if rayon::current_num_threads() > 1
@@ -244,84 +228,6 @@ fn apply_shared(filter: &craft_blur::Gaussian, pixels: &mut [f32], shape: Shape)
         });
     }
     filter.apply(pixels, shape, Edge::Clamp, &mut Scratch::default(), Cancel::Never)
-}
-
-struct RecursiveCompatibility {
-    feedback: [f64; 3],
-    gain: f64,
-    boundary: [[f64; 3]; 3],
-}
-
-impl RecursiveCompatibility {
-    fn new(sigma: f32) -> Self {
-        let sigma64 = f64::from(sigma);
-        let mut q = if sigma64 < 3.556 { -0.2568 + 0.5784 * sigma64 + 0.0561 * sigma64 * sigma64 } else { 2.5091 + 0.9804 * (sigma64 - 3.556) };
-        let (real, pair, imaginary) = (1.16680_f64, 1.10783_f64, 1.40586_f64);
-        let norm = pair * pair + imaginary * imaginary;
-        let linear = 2.0 * (1.0 / real + 2.0 * pair / norm);
-        let quadratic = 2.0 * (1.0 / (real * real) + 2.0 * (pair * pair - imaginary * imaginary) / (norm * norm));
-        for _ in 0..5 {
-            q -= (q * (quadratic * q + linear) - sigma64 * sigma64) / (2.0 * quadratic * q + linear);
-        }
-        let denominator = (q + real) * ((q + pair).powi(2) + imaginary * imaginary);
-        let feedback = [
-            q * ((q + pair).powi(2) + imaginary * imaginary + 2.0 * (q + real) * (q + pair)) / denominator,
-            -q * q * (3.0 * q + real + 2.0 * pair) / denominator,
-            q.powi(3) / denominator,
-        ];
-        let gain = real * norm / denominator;
-        let [first, second, third] = feedback;
-        let scale = 1.0 / ((1.0 + first - second + third) * gain * (1.0 + second + (first - third) * third));
-        let boundary = [
-            [1.0 - second - third * (first + third), (first + third) * (second + first * third), third * (first + second * third)],
-            [first + second * third, (1.0 - second) * (second + first * third), third * (1.0 - second - third * (first + third))],
-            [
-                first * (first + third) + second * (1.0 - second),
-                first * (second - third * third) + third * (1.0 + second * (second - 1.0) - third * third),
-                third * (first + second * third),
-            ],
-        ]
-        .map(|row| row.map(|value| value * scale * gain));
-        Self { feedback, gain, boundary }
-    }
-
-    fn filter<const CHANNELS: usize, T: Copy>(&self, line: &mut [T], widen: impl Fn(T) -> [f64; CHANNELS], narrow: impl Fn([f64; CHANNELS]) -> T) {
-        let Some((&left, &right)) = line.first().zip(line.last()) else { return };
-        let left = widen(left);
-        let right = widen(right);
-        let mut state = [[0.0; CHANNELS]; 3];
-        let mut forward = Vec::with_capacity(line.len());
-        for &pixel in line.iter() {
-            let input = widen(pixel);
-            let value = std::array::from_fn(|channel| {
-                self.gain * (input[channel] - left[channel])
-                    + self.feedback[0] * state[0][channel]
-                    + self.feedback[1] * state[1][channel]
-                    + self.feedback[2] * state[2][channel]
-            });
-            state = [value, state[0], state[1]];
-            forward.push(value);
-        }
-        let mut future: [[f64; CHANNELS]; 3] = self.boundary.map(|row| {
-            std::array::from_fn(|channel| {
-                row.iter().zip(&state).map(|(coefficient, past)| coefficient * (past[channel] + left[channel] - right[channel])).sum::<f64>()
-            })
-        });
-        if let Some(last) = line.last_mut() {
-            *last = narrow(std::array::from_fn(|channel| future[0][channel] + right[channel]));
-        }
-        let count = line.len().saturating_sub(1);
-        for (pixel, input) in line[..count].iter_mut().zip(&forward[..count]).rev() {
-            let value = std::array::from_fn(|channel| {
-                self.gain * (input[channel] + left[channel] - right[channel])
-                    + self.feedback[0] * future[0][channel]
-                    + self.feedback[1] * future[1][channel]
-                    + self.feedback[2] * future[2][channel]
-            });
-            *pixel = narrow(std::array::from_fn(|channel| value[channel] + right[channel]));
-            future = [value, future[0], future[1]];
-        }
-    }
 }
 
 fn transpose<T: Pixel>(source: &Image<T>, destination: &mut Image<T>) {

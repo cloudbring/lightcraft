@@ -98,7 +98,7 @@ pub trait Pixel: Copy + Default + Send + Sync {
 
 impl Pixel for f32 {
     fn gaussian_image(image: &Image<Self>, filter: &crate::blur::Gaussian) -> Option<Image<Self>> {
-        filter.filter_packed(image, |pixels| pixels, |value| [f64::from(value)], |[value]| value as f32)
+        filter.filter_packed::<1, Self>(image, |pixels| pixels)
     }
     fn gaussian_line(line: &mut [Self], filter: &crate::blur::Gaussian) {
         filter.filter(line, |value| [f64::from(value)], |[value]| value as f32);
@@ -114,7 +114,7 @@ impl Pixel for f32 {
 
 impl Pixel for [f32; 3] {
     fn gaussian_image(image: &Image<Self>, filter: &crate::blur::Gaussian) -> Option<Image<Self>> {
-        filter.filter_packed(image, |pixels| pixels.as_flattened_mut(), |value| value.map(f64::from), |value| value.map(|channel| channel as f32))
+        filter.filter_packed::<3, Self>(image, |pixels| pixels.as_flattened_mut())
     }
     fn gaussian_line(line: &mut [Self], filter: &crate::blur::Gaussian) {
         filter.filter(line, |value| value.map(f64::from), |value| value.map(|channel| channel as f32));
@@ -130,7 +130,7 @@ impl Pixel for [f32; 3] {
 
 impl Pixel for [f32; 4] {
     fn gaussian_image(image: &Image<Self>, filter: &crate::blur::Gaussian) -> Option<Image<Self>> {
-        filter.filter_packed(image, |pixels| pixels.as_flattened_mut(), |value| value.map(f64::from), |value| value.map(|channel| channel as f32))
+        filter.filter_packed::<4, Self>(image, |pixels| pixels.as_flattened_mut())
     }
     fn gaussian_line(line: &mut [Self], filter: &crate::blur::Gaussian) {
         filter.filter(line, |value| value.map(f64::from), |value| value.map(|channel| channel as f32));

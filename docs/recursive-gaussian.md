@@ -16,7 +16,7 @@ each worker job, with no per-line allocations. Release aarch64 assembly contains
 packed NEON `fmul.2d`, `fadd.2d` and f32-to-f64 conversions, not scalar-only
 dependency chains. No SIMD dependency or unsafe code is added.
 
-Below sigma 2.5, the existing variance-exact sampled kernel helper is used, with
+Below sigma 2.5, craft-blur's variance-exact sampled kernel is used, with
 f64 accumulation and clamp-edge samples. Both axes share a 64-row tiled working
 buffer, avoiding a full-image intermediate; row scratch is reused per worker.
 The seven-tap horizontal window is unrolled while retaining tap summation order.
@@ -176,20 +176,21 @@ acceptance threshold changes in this pass.
 
 ## Shared craft-blur migration (#2)
 
-The consumer pins `cloudbring/craft-libs` branch `algo/2-craft-blur` at
-`75bb40cf0c06b7e046874f389376acbfd86915ab` in `Cargo.lock`. The workspace
+The consumer pins `cloudbring/craft-libs` branch `algo/2-craft-blur-midband` at
+`d98d0605bb63a0862330f3885605ec1def323643` in `Cargo.lock`. The workspace
 dependency has a TODO to repoint to the upstream revision when the crate lands.
 No processing version, cache key, fixture or #176 acceptance test is changed.
 
-V3 uses `craft_blur::Gaussian` with `Quality::Recursive` and `Edge::Clamp`,
-except for **2.5 <= sigma < 8**. The local sampled-kernel implementation and
-unused #33 helper are removed. Native floating pixels expose their existing
+V3 uses `craft_blur::Gaussian` with `Quality::RecursiveRaw` and `Edge::Clamp`
+across the entire sigma range, including **2.5 <= sigma < 8**. All local
+sampled-kernel and recurrence implementations are removed, along with the
+unused #33 helper. Native floating pixels expose their existing
 storage as safe flat slices, without a channel conversion or second image copy.
 Recursive rows and disjoint column stripes retain per-worker reusable scratch;
 sampled output bands use the crate's tiled API with source halos and reusable
 per-worker scratch, retaining parallelism without duplicating convolution code.
 
-### Compatibility decisions and upstream blocker
+### Compatibility decisions
 
 `BoxApprox` is **not** a bit-identical replacement for V1/V2. Its f64 running
 sums differ from LightCraft's f32 running sums, even at sigma 1: on a seeded
@@ -197,24 +198,68 @@ sums differ from LightCraft's f32 running sums, even at sigma 1: on a seeded
 `gaussian_box`, its radii, horizontal passes and re-primed vertical bands remain
 unchanged, including for the GPU and existing non-versioned callers.
 
-The supplied crate's **public Recursive quality is not fully bit-identical to
-39aa4d25 either**: it selects the sampled kernel below sigma 8 to enforce its
+The shared crate's **public Recursive quality is not bit-identical to
+39aa4d25**: it selects the sampled kernel below sigma 8 to enforce its
 0.01 shape-error contract, whereas V3 selects recurrence from sigma 2.5.
-At sigma 4 all 33,667 samples in that random plane differ. Its raw recursive
-constructor and pass execution are private, so the current public API cannot
-express V3's existing response in this interval. The original coefficients,
-scalar line hook and vectorized recurrence are retained exclusively for this
-compatibility interval in `RecursiveCompatibility` and `blur/compatibility.rs`.
-This also avoids regressing the interval to a slower scalar/transpose path.
+At sigma 4 all 33,667 samples in that random plane differ. The upstream
+`RecursiveRaw` policy added in `d98d0605` retains V3's original 2.5 transition
+without weakening `Recursive`'s quality contract. The consumer selects that
+policy directly and no longer retains `RecursiveCompatibility` or
+`blur/compatibility.rs`. Its parallel row/column wrapper is unchanged.
 
-**Unfinished:** removing that last recurrence and making V3 a wholly thin
-wrapper requires an upstream compatibility constructor/executor that retains
-the original 2.5 transition without weakening the public quality contract.
-Changing V3 output or a saved processing version to hide this mismatch is not
-part of this migration. The new tests explicitly demonstrate both incompatible
-shared paths, alongside frozen baseline hashes for random planes.
+The integration tests keep demonstrating the incompatible guarded Recursive
+and legacy BoxApprox paths. Frozen random-plane hashes from the independent
+original `39aa4d25` source now cover 27 sigmas, including eleven points in the
+2.5–8 band and both sides of the 2.5 transition, the q-polynomial transition,
+and the last representable f32 below 8. A direct RecursiveRaw comparison checks
+every output sample across the finite positive range. All #176 tests remain
+unchanged, including the documented shape exceptions.
 
-### Identity and timing evidence
+### RecursiveRaw completion verification (November 3, 2026)
+
+The isolated original `39aa4d25` raster package was rebuilt under `target-2`.
+Direct `f32::to_bits` comparisons cover 13 image dimensions, 28 sigmas,
+plane/RGB/RGBA pixels, and both Gaussian and legacy box output: **2,184 cases /
+196,656,320 samples / zero differing bits**, independently with one and four
+Rayon workers. This includes **858 cases in 2.5 <= sigma < 8** (429 Gaussian,
+429 legacy), including both sides of the q-polynomial transition and the last
+f32 below 8. Negative/zero/NaN/infinite sigma and empty images are included.
+
+Deleting the remaining compatibility implementation removes **226 net blur
+lines**, reducing `blur.rs` plus its helper from 592 to 366 lines. Legacy box
+implementations, processing versions, pipeline fixtures and #176 tests are
+unchanged. Raster/pipeline tests pass **266 / 0** (3 ignored), raster without
+default features **39 / 0**, and release #176 accuracy tests **6 / 0**.
+
+Single-worker 24 MP timings use the original and consumer in the same release
+binary, alternating execution order and taking the best of nine runs, including
+allocations. After the completed native/wasm build artifacts were removed:
+
+| Sigma | Original 39aa4d25 ms | RecursiveRaw consumer ms | Change |
+|---:|---:|---:|---:|
+| 1 | 33.54 | 34.28 | +2.19% |
+| 2.5 | 70.17 | 69.73 | -0.62% |
+| 4 | 70.19 | 69.75 | -0.63% |
+| 7.9 | 70.31 | 69.73 | -0.83% |
+| 8 | 70.50 | 69.96 | -0.77% |
+| 64 | 70.28 | 69.78 | -0.71% |
+
+All six points meet the same-run 5% regression budget. A loaded-host run before
+artifact cleanup measured sigma 64 at 113.99 / 127.27 ms (+11.64%); as in the
+initial migration, timings under concurrent host workloads are not a stable
+performance bound.
+
+Full `cargo xtask ci` passes all eight gates, with **5,607 workspace tests
+passed / 0 failed / 43 ignored**. The 152 runtime skips (141 corpus, 8 model,
+2 fonts, 1 GPU) remain separately reported, not verified checks. Standalone
+workspace clippy `--all-targets -- -D warnings`, fmt, layers and wasm also pass;
+wasm retains the eight existing UI warnings. All commands use rustup stable
+1.99.0 and worktree-local `CARGO_TARGET_DIR=target-2`, with
+`CARGO_INCREMENTAL=0`; full CI uses the existing craft-fonts checkout. The
+temporary reference package, build artifacts and generated CI reports are
+removed after validation.
+
+### Initial migration identity and timing evidence
 
 An isolated reference package was built from the original raster sources at
 `39aa4d256939c3703f1e22c0f2a715a4c98a189f`, under the disposable `target-2`
