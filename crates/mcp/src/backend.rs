@@ -30,19 +30,24 @@ pub struct Remote {
     addr: String,
     conn: Option<(BufReader<TcpStream>, TcpStream)>,
     next_id: u64,
+    token: Option<String>,
 }
 
 impl Remote {
     /// Connect to `addr` (e.g. `127.0.0.1:7980`), failing fast when nothing is listening.
     pub fn connect(addr: &str) -> std::io::Result<Self> {
-        let mut r = Self { addr: addr.to_string(), conn: None, next_id: 1 };
+        Self::connect_with_token(addr, crate::security::client_token()?)
+    }
+
+    pub fn connect_with_token(addr: &str, token: String) -> std::io::Result<Self> {
+        let mut r = Self { addr: addr.to_string(), conn: None, next_id: 1, token: Some(token) };
         r.reconnect()?;
         Ok(r)
     }
 
     /// A remote that connects on first use (the app may start after the MCP server).
     pub fn lazy(addr: &str) -> Self {
-        Self { addr: addr.to_string(), conn: None, next_id: 1 }
+        Self { addr: addr.to_string(), conn: None, next_id: 1, token: None }
     }
 
     pub fn addr(&self) -> &str {
@@ -54,12 +59,25 @@ impl Remote {
         let mut last = std::io::Error::new(std::io::ErrorKind::NotFound, format!("cannot resolve {}", self.addr));
         for sa in self.addr.to_socket_addrs()? {
             match TcpStream::connect_timeout(&sa, Duration::from_millis(800)) {
-                Ok(s) => {
+                Ok(mut s) => {
                     s.set_nodelay(true).ok();
                     // The app answers within 60 s (its own timeout); leave headroom.
                     s.set_read_timeout(Some(Duration::from_secs(90))).ok();
                     let read = s.try_clone()?;
-                    self.conn = Some((BufReader::new(read), s));
+                    let token = match &self.token {
+                        Some(token) => token.clone(),
+                        None => crate::security::client_token()?,
+                    };
+                    let mut reader = BufReader::new(read);
+                    writeln!(s, "{}", json!({"id":0,"method":"auth","params":{"token":token}}))?;
+                    let reply: Value = serde_json::from_str(&read_reply(&mut reader, 1024)?)?;
+                    if reply.get("id") != Some(&json!(0))
+                        || reply.get("ok").and_then(Value::as_bool) != Some(true)
+                        || reply.get("result").and_then(|result| result.get("authenticated")).and_then(Value::as_bool) != Some(true)
+                    {
+                        return Err(std::io::Error::other("authentication rejected"));
+                    }
+                    self.conn = Some((reader, s));
                     return Ok(());
                 }
                 Err(e) => last = e,
@@ -211,6 +229,19 @@ mod tests {
     use std::sync::Arc;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
+    fn remote(addr: &str) -> Remote {
+        Remote { addr: addr.to_string(), conn: None, next_id: 1, token: Some("a".repeat(64)) }
+    }
+
+    fn authenticate_fake(reader: &mut BufReader<TcpStream>, writer: &mut TcpStream) {
+        let mut line = String::new();
+        reader.read_line(&mut line).unwrap();
+        let request: Value = serde_json::from_str(&line).unwrap();
+        assert_eq!(request["method"], "auth");
+        assert_eq!(request["params"]["token"], "a".repeat(64));
+        writeln!(writer, "{}", json!({"id":0,"ok":true,"result":{"authenticated":true}})).unwrap();
+    }
+
     fn with_reply(reply: &[u8], check: impl FnOnce(&mut Remote, Result<Value, String>)) {
         let _serial = crate::serial_sockets_and_children();
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
@@ -221,6 +252,7 @@ mod tests {
             stream.set_read_timeout(Some(Duration::from_secs(2))).unwrap();
             let mut writer = stream.try_clone().unwrap();
             let mut reader = BufReader::new(stream);
+            authenticate_fake(&mut reader, &mut writer);
             let mut request = String::new();
             reader.read_line(&mut request).unwrap();
             let request: Value = serde_json::from_str(&request).unwrap();
@@ -231,7 +263,7 @@ mod tests {
             assert_eq!(reader.read_line(&mut extra).unwrap(), 0, "request was resent on the same connection");
             listener
         });
-        let mut remote = Remote::lazy(&addr);
+        let mut remote = remote(&addr);
         let result = remote.call("engine.execute", json!({"command": "edit.undo"}));
         check(&mut remote, result);
         drop(remote);
@@ -340,6 +372,7 @@ mod tests {
             stream.set_read_timeout(Some(Duration::from_secs(2))).unwrap();
             let mut writer = stream.try_clone().unwrap();
             let mut reader = BufReader::new(stream);
+            authenticate_fake(&mut reader, &mut writer);
             for id in 1..=2 {
                 let mut line = String::new();
                 reader.read_line(&mut line).unwrap();
@@ -348,7 +381,7 @@ mod tests {
                 writeln!(writer, "{}", json!({"id": id, "ok": true, "result": id})).unwrap();
             }
         });
-        let mut remote = Remote::lazy(&addr);
+        let mut remote = remote(&addr);
         for id in 1..=2 {
             assert_eq!(remote.call("engine.commands", json!({})).unwrap(), json!(id));
         }
@@ -365,13 +398,16 @@ mod tests {
         std::thread::spawn(move || {
             // Every connection: read the request, count it, drop without replying.
             while let Ok((s, _)) = listener.accept() {
+                let mut writer = s.try_clone().unwrap();
+                let mut reader = BufReader::new(s);
+                authenticate_fake(&mut reader, &mut writer);
                 let mut line = String::new();
-                if BufReader::new(s).read_line(&mut line).unwrap_or(0) > 0 {
+                if reader.read_line(&mut line).unwrap_or(0) > 0 {
                     seen2.fetch_add(1, Ordering::SeqCst);
                 }
             }
         });
-        let mut remote = Remote::lazy(&addr);
+        let mut remote = remote(&addr);
         let err = remote.call("engine.execute", json!({})).unwrap_err();
         assert!(err.contains("outcome is unknown"), "{err}");
         std::thread::sleep(Duration::from_millis(200));
@@ -389,15 +425,17 @@ mod tests {
             // Every connection: answer one request, then close (as after an app restart).
             while let Ok((s, _)) = listener.accept() {
                 let mut writer = s.try_clone().unwrap();
+                let mut reader = BufReader::new(s);
+                authenticate_fake(&mut reader, &mut writer);
                 let mut line = String::new();
-                if BufReader::new(s).read_line(&mut line).unwrap_or(0) > 0 {
+                if reader.read_line(&mut line).unwrap_or(0) > 0 {
                     seen2.fetch_add(1, Ordering::SeqCst);
                     let request: Value = serde_json::from_str(&line).unwrap();
                     writeln!(writer, "{}", json!({"id": request["id"], "ok": true, "result": 7})).unwrap();
                 }
             }
         });
-        let mut remote = Remote::lazy(&addr);
+        let mut remote = remote(&addr);
         assert_eq!(remote.call("engine.commands", json!({})).unwrap(), json!(7));
         std::thread::sleep(Duration::from_millis(200));
         assert_eq!(remote.call("engine.commands", json!({})).unwrap(), json!(7));
@@ -419,7 +457,10 @@ mod tests {
         // BSD kernels (macOS, FreeBSD) let an accepted socket inherit the listener's non-blocking flag.
         stream.set_nonblocking(false).unwrap();
         stream.set_read_timeout(Some(Duration::from_secs(3))).unwrap();
-        (BufReader::new(stream.try_clone().unwrap()), stream)
+        let mut reader = BufReader::new(stream.try_clone().unwrap());
+        let mut stream = stream;
+        authenticate_fake(&mut reader, &mut stream);
+        (reader, stream)
     }
 
     fn read_request(reader: &mut BufReader<TcpStream>) -> Value {
@@ -483,7 +524,7 @@ mod tests {
             assert_eq!(reader.read_line(&mut line).unwrap(), 0, "nothing else arrives: {line}");
             ran
         });
-        let mut remote = Remote::lazy(&addr);
+        let mut remote = remote(&addr);
         assert_eq!(remote.call("engine.execute", json!({"command": "edit.undo"})).unwrap(), json!(1));
         expired.recv_timeout(Duration::from_secs(5)).unwrap();
         let deadline = std::time::Instant::now() + Duration::from_secs(5);
@@ -512,7 +553,7 @@ mod tests {
             }
             listener
         });
-        let mut remote = Remote::lazy(&addr);
+        let mut remote = remote(&addr);
         assert_eq!(remote.call("engine.execute", json!({"command": "edit.undo"})), Err(IDLE_CLOSE_ERROR.to_string()));
         assert!(remote.conn.is_none(), "the closed connection is not reused");
         drop(remote);

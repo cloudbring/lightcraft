@@ -94,7 +94,7 @@ fn file_writers_advertise_destructive_effects() {
         assert_eq!(preview["annotations"]["destructiveHint"], false);
     }
     let addr = fake_app();
-    let mut server = Server::new(Box::new(Remote::connect(&addr).unwrap()));
+    let mut server = Server::new(Box::new(Remote::connect_with_token(&addr, "a".repeat(64)).unwrap()));
     let replies = session(&mut server, &[json!({"jsonrpc": "2.0", "id": 1, "method": "tools/list"})]);
     let tools = replies[0]["result"]["tools"].as_array().unwrap();
     let screenshot = tools.iter().find(|t| t["name"] == "screenshot").unwrap();
@@ -152,6 +152,11 @@ fn fake_app() -> String {
             for line in BufReader::new(stream).lines() {
                 let Ok(line) = line else { break };
                 let msg: Value = serde_json::from_str(&line).unwrap();
+                if msg["method"] == "auth" {
+                    assert_eq!(msg["params"]["token"], "a".repeat(64));
+                    writeln!(out, "{}", json!({"id":msg["id"],"ok":true,"result":{"authenticated":true}})).unwrap();
+                    continue;
+                }
                 let reply = match backend.call(msg["method"].as_str().unwrap(), msg["params"].clone()) {
                     Ok(v) => json!({"id": msg["id"], "ok": true, "result": v}),
                     Err(e) => json!({"id": msg["id"], "ok": false, "error": e}),
@@ -168,7 +173,7 @@ fn fake_app() -> String {
 #[test]
 fn remote_set_exposure_and_render() {
     let addr = fake_app();
-    let remote = Remote::connect(&addr).unwrap();
+    let remote = Remote::connect_with_token(&addr, "a".repeat(64)).unwrap();
     assert!(remote.has_ui());
     let mut server = Server::new(Box::new(remote));
     exposure_roundtrip(&mut server);

@@ -32,15 +32,32 @@ pub fn start(port: u16, ctx: egui::Context) -> Receiver<ControlRequest> {
             return rx;
         }
     };
+    let token = match lightcraft_mcp::security::generate_token() {
+        Ok(token) => token,
+        Err(error) => {
+            eprintln!("lightcraft: control server cannot generate token: {error}");
+            return rx;
+        }
+    };
+    if let Some(path) = std::env::var_os("LIGHTCRAFT_CONTROL_TOKEN_FILE") {
+        if let Err(error) = lightcraft_mcp::security::write_token(std::path::Path::new(&path), &token) {
+            eprintln!("lightcraft: control server cannot create token file: {error}");
+            return rx;
+        }
+        eprintln!("lightcraft: control token file: {}", std::path::Path::new(&path).display());
+    } else {
+        eprintln!("lightcraft: control token: {token}");
+    }
     log::info!("control server listening on 127.0.0.1:{port}");
-    std::thread::spawn(move || accept_loop(listener, tx, ctx));
+    std::thread::spawn(move || accept_loop(listener, tx, ctx, token));
     rx
 }
 
-fn accept_loop(listener: TcpListener, tx: Sender<ControlRequest>, ctx: egui::Context) {
+fn accept_loop(listener: TcpListener, tx: Sender<ControlRequest>, ctx: egui::Context, token: String) {
     let open = Arc::new(AtomicUsize::new(0));
+    let token = Arc::new(token);
     for stream in listener.incoming().flatten() {
-        let _ = spawn_connection(stream, tx.clone(), ctx.clone(), Arc::clone(&open), IDLE_TIMEOUT);
+        let _ = spawn_connection(stream, tx.clone(), ctx.clone(), Arc::clone(&open), IDLE_TIMEOUT, Arc::clone(&token));
     }
 }
 
@@ -51,6 +68,7 @@ fn spawn_connection(
     ctx: egui::Context,
     open: Arc<AtomicUsize>,
     idle_timeout: Duration,
+    token: Arc<String>,
 ) -> Option<std::thread::JoinHandle<()>> {
     if open.fetch_add(1, Ordering::SeqCst) >= MAX_CONNECTIONS {
         open.fetch_sub(1, Ordering::SeqCst);
@@ -58,7 +76,7 @@ fn spawn_connection(
         return None;
     }
     Some(std::thread::spawn(move || {
-        serve(stream, &tx, &ctx, idle_timeout);
+        serve(stream, &tx, &ctx, idle_timeout, &token);
         open.fetch_sub(1, Ordering::SeqCst);
     }))
 }
@@ -82,7 +100,11 @@ pub const HIDDEN_WINDOW_ERROR: &str = "the app drew no frame for 5 s, so the req
 /// while a client is connected (a link in the browser, Show in Explorer, an external editor) kept a
 /// copy of the connection: closing it then reached the client only when that program exited, as a
 /// reset instead of a clean close.
-fn serve(stream: TcpStream, tx: &Sender<ControlRequest>, ctx: &egui::Context, idle_timeout: Duration) {
+fn serve(mut stream: TcpStream, tx: &Sender<ControlRequest>, ctx: &egui::Context, idle_timeout: Duration, token: &str) {
+    if !authenticate(&mut stream, token) {
+        close_gracefully(&stream);
+        return;
+    }
     if let Err(e) = stream.set_read_timeout(Some(idle_timeout)) {
         log::warn!("control connection closed: could not set idle read timeout: {e}");
         return;
@@ -94,6 +116,41 @@ fn serve(stream: TcpStream, tx: &Sender<ControlRequest>, ctx: &egui::Context, id
         ctx.request_repaint();
         Some(await_reply(&rrx, &state, || ctx.cumulative_pass_nr(), || ctx.request_repaint(), NO_FRAMES_AFTER, REPLY_TIMEOUT))
     });
+}
+
+fn authenticate(stream: &mut TcpStream, expected: &str) -> bool {
+    let deadline = std::time::Instant::now() + Duration::from_secs(10);
+    let mut line = Vec::new();
+    let mut complete = false;
+    while line.len() < 1024 {
+        let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+        if remaining.is_zero() || stream.set_read_timeout(Some(remaining)).is_err() {
+            return false;
+        }
+        let mut byte = [0];
+        if stream.read_exact(&mut byte).is_err() {
+            return false;
+        }
+        if byte[0] == b'\n' {
+            complete = true;
+            break;
+        }
+        line.push(byte[0]);
+    }
+    let request: Value = serde_json::from_slice(&line).unwrap_or(Value::Null);
+    let id = request.get("id").cloned().unwrap_or(Value::Null);
+    let supplied = request.get("params").and_then(|params| params.get("token")).and_then(Value::as_str).unwrap_or("");
+    let valid =
+        complete && request.get("method").and_then(Value::as_str) == Some("auth") && lightcraft_mcp::security::token_matches(expected, supplied);
+    if !valid {
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    let response = if valid {
+        json!({"id":id,"ok":true,"result":{"authenticated":true}})
+    } else {
+        json!({"id":id,"ok":false,"error":"authentication required"})
+    };
+    writeln!(stream, "{response}").is_ok() && valid
 }
 
 /// The longest a closing connection is drained, however slowly its peer keeps sending.
@@ -290,6 +347,55 @@ fn serve_lines<R: Read, W: Write>(read: R, mut out: W, mut handle: impl FnMut(St
 mod tests {
     use super::*;
 
+    fn auth_exchange(first: Value, command: bool) -> (Value, bool) {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let addr = listener.local_addr().unwrap();
+        let (tx, rx) = channel();
+        let worker = std::thread::spawn(move || {
+            let (stream, _) = listener.accept().unwrap();
+            serve(stream, &tx, &egui::Context::default(), IDLE_TIMEOUT, &"a".repeat(64));
+        });
+        let mut client = TcpStream::connect(addr).unwrap();
+        client.set_read_timeout(Some(Duration::from_secs(2))).unwrap();
+        writeln!(client, "{first}").unwrap();
+        let mut reader = BufReader::new(client.try_clone().unwrap());
+        let mut line = String::new();
+        reader.read_line(&mut line).unwrap();
+        let response = serde_json::from_str(&line).unwrap();
+        let called = if command {
+            writeln!(client, "{}", json!({"method":"engine.execute","params":{"command":"file.save"}})).unwrap();
+            let request: ControlRequest = rx.recv_timeout(Duration::from_secs(2)).unwrap();
+            drop(request);
+            true
+        } else {
+            false
+        };
+        let _ = client.shutdown(std::net::Shutdown::Both);
+        worker.join().unwrap();
+        (response, called || rx.try_recv().is_ok())
+    }
+
+    #[test]
+    fn unauthenticated_command_never_dispatches() {
+        let (reply, called) = auth_exchange(json!({"method":"engine.execute","params":{"command":"file.save"}}), false);
+        assert_eq!(reply["ok"], false);
+        assert!(!called);
+    }
+
+    #[test]
+    fn wrong_token_is_rejected() {
+        let (reply, called) = auth_exchange(json!({"method":"auth","params":{"token":"b".repeat(64)}}), false);
+        assert_eq!(reply["ok"], false);
+        assert!(!called);
+    }
+
+    #[test]
+    fn correct_token_permits_dispatch() {
+        let (reply, called) = auth_exchange(json!({"method":"auth","params":{"token":"a".repeat(64)}}), true);
+        assert_eq!(reply["result"]["authenticated"], true);
+        assert!(called);
+    }
+
     /// Own the client and worker together: even a failing timeout assertion closes the socket
     /// before joining, so the regression cannot leave a worker stuck in a read.
     struct Connection {
@@ -309,10 +415,15 @@ mod tests {
             // Small test messages must not wait for Nagle's algorithm or a delayed ACK.
             client.set_nodelay(true).unwrap();
             stream.set_nodelay(true).unwrap();
+            writeln!(client, "{}", json!({"id":0,"method":"auth","params":{"token":"a".repeat(64)}})).unwrap();
             before(&mut client);
             let (tx, requests) = channel();
-            let worker = spawn_connection(stream, tx, egui::Context::default(), Arc::clone(open), idle).unwrap();
-            Self { client: BufReader::new(client), requests, worker: Some(worker) }
+            let worker = spawn_connection(stream, tx, egui::Context::default(), Arc::clone(open), idle, Arc::new("a".repeat(64))).unwrap();
+            let mut client = BufReader::new(client);
+            let mut reply = String::new();
+            client.read_line(&mut reply).unwrap();
+            assert_eq!(serde_json::from_str::<Value>(&reply).unwrap()["ok"], true);
+            Self { client, requests, worker: Some(worker) }
         }
 
         fn join(&mut self) {
@@ -536,10 +647,13 @@ mod tests {
         let (tx, _rx) = channel::<ControlRequest>();
         let server = std::thread::spawn(move || {
             let (s, _) = listener.accept().unwrap();
-            serve(s, &tx, &egui::Context::default(), IDLE_TIMEOUT);
+            serve(s, &tx, &egui::Context::default(), IDLE_TIMEOUT, &"a".repeat(64));
         });
         let mut c = TcpStream::connect(addr).unwrap();
         c.set_read_timeout(Some(Duration::from_secs(20))).unwrap();
+        writeln!(c, "{}", json!({"id":0,"method":"auth","params":{"token":"a".repeat(64)}})).unwrap();
+        let mut response = String::new();
+        BufReader::new(&c).read_line(&mut response).unwrap();
         // the connection is being served: start a program that lives about 4 s
         std::thread::sleep(Duration::from_millis(200));
         let mut child = std::process::Command::new("cmd").args(["/c", "ping -n 5 127.0.0.1 >nul"]).spawn().unwrap();

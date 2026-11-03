@@ -247,7 +247,11 @@ through the same entry point. An agent can cull a shoot, develop it, mask a sky 
 ```sh
 lightcraft --control 7980 ~/Pictures/trip
 ```
+The app prints a per-launch control token to stderr. Set `LIGHTCRAFT_CONTROL_TOKEN` for clients,
+or set `LIGHTCRAFT_CONTROL_TOKEN_FILE` to a new private file path for both app and clients. Each
+raw connection must authenticate first as described in [the control protocol](docs/control-protocol.md).
 ```jsonc
+{"id": 0, "method": "auth", "params": {"token": "<control token>"}}
 {"method": "engine.execute", "params": {"command": "photo.flag",  "params": {"flag": "pick"}}}
 {"method": "engine.execute", "params": {"command": "develop.set", "params": {"values": {"light.highlights": -45, "light.shadows": 38}}}}
 {"method": "engine.execute", "params": {"command": "mask.add",    "params": {"kind": "radial", "center": [0.62, 0.4], "rx": 0.2, "ry": 0.14}}}

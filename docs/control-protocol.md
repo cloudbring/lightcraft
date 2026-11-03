@@ -1,7 +1,19 @@
 # Control protocol
 
 `lightcraft --control 7980` (or `LIGHTCRAFT_CONTROL_PORT=7980`) starts a JSON-lines server on
-`127.0.0.1:7980` (loopback only). One request per line, one reply per line, in order:
+`127.0.0.1:7980` (loopback only). Each launch generates a random token, printed to stderr. Set
+`LIGHTCRAFT_CONTROL_TOKEN_FILE` to a new path to write it instead (mode 0600 on Unix; an existing
+file is never overwritten). Protect the token as a password; remove the file after use. Authenticate
+on each connection before sending commands:
+
+```text
+→ {"id": 0, "method": "auth", "params": {"token": "<64 hexadecimal characters>"}}
+← {"id": 0, "ok": true, "result": {"authenticated": true}}
+```
+
+CLI and MCP clients read `LIGHTCRAFT_CONTROL_TOKEN` or `LIGHTCRAFT_CONTROL_TOKEN_FILE` (set only
+one). Token files must not be accessible by group or others on Unix. A restart requires the new token.
+One request per line, one reply per line, in order:
 
 ```text
 → {"id": 1, "method": "engine.execute", "params": {"command": "photo.rate", "params": {"rating": 4}}}
@@ -48,7 +60,7 @@ optional; blank lines are skipped). Anything else — text that isn't JSON, a JS
 it on that connection runs. This keeps an HTTP request (for example a web page's cross-origin `fetch` to
 `127.0.0.1:<port>`) from smuggling a command in its body: its request line is rejected first. Junk never reaches the
 UI thread, and at most 16 connections are served at once (further ones get an error line and are closed). Clients
-that hit an error reply should reconnect. The port has no authentication, so only enable it when you need it. The MCP server's connect
+that hit an error reply should reconnect and authenticate again. The MCP server's connect
 mode ([mcp.md](mcp.md)) is a thin layer over this channel. Implementation:
 `crates/ui-egui/src/control.rs` (methods) and `apps/lightcraft/src/control_server.rs` (transport).
 

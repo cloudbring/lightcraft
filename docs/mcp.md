@@ -1,5 +1,9 @@
 # LightCraft MCP server
 
+For `--connect`, set `LIGHTCRAFT_CONTROL_TOKEN` to the app's printed token, or set
+`LIGHTCRAFT_CONTROL_TOKEN_FILE` to the private token file shared with the app. See the
+[control protocol](control-protocol.md) for the handshake and file permissions.
+
 `lightcraft-cli mcp` exposes LightCraft to AI agents through the
 [Model Context Protocol](https://modelcontextprotocol.io): newline-delimited JSON-RPC 2.0 over
 stdio (protocol revision `2025-06-18`; `2025-03-26` and `2024-11-05` clients are accepted). The
