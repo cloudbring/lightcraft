@@ -1200,6 +1200,14 @@ version = "0.1.0"
 source = "git+https://github.com/storytold/craft-libs?rev=c5a1cbfb5f9049f9270955caffb5bee5997aebf7#c5a1cbfb5f9049f9270955caffb5bee5997aebf7"
 
 [[package]]
+name = "craft-hash"
+version = "0.1.0"
+source = "git+https://github.com/cloudbring/craft-libs?branch=algo%2Fintegration#91e0328f63f027086214472d48cfb4909d95a2a6"
+dependencies = [
+ "sha2",
+]
+
+[[package]]
 name = "craft-i18n"
 version = "0.1.0"
 source = "git+https://github.com/storytold/craft-libs?rev=c5a1cbfb5f9049f9270955caffb5bee5997aebf7#c5a1cbfb5f9049f9270955caffb5bee5997aebf7"
@@ -3574,6 +3582,7 @@ name = "lightcraft-catalog"
 version = "0.18.0"
 dependencies = [
  "chrono",
+ "craft-hash",
  "crc32fast",
  "dhat",
  "lightcraft-develop",
@@ -3668,6 +3677,7 @@ dependencies = [
 name = "lightcraft-denoise-core"
 version = "0.18.0"
 dependencies = [
+ "craft-hash",
  "dhat",
  "lightcraft-raster",
  "miniz_oxide 0.9.1",
@@ -3684,6 +3694,7 @@ dependencies = [
 name = "lightcraft-develop"
 version = "0.18.0"
 dependencies = [
+ "craft-hash",
  "lightcraft-color",
  "lightcraft-geom",
  "miniz_oxide 0.9.1",
@@ -3740,6 +3751,7 @@ dependencies = [
 name = "lightcraft-faces"
 version = "0.18.0"
 dependencies = [
+ "craft-hash",
  "lightcraft-testkit",
  "matrixmultiply",
  "ndarray",

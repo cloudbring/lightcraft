@@ -50,20 +50,32 @@ pub const DEFAULT_FORGET_DAYS: u32 = 30;
 /// Records removed per logged batch (keeps log lines a reasonable size).
 const BATCH: usize = 2000;
 
-/// 64-bit FNV-1a over everything written to it (stable across builds and platforms, unlike
-/// `std`'s hasher), so a photo is hashed as it serialises, without a buffer.
-struct Fnv(u64);
+#[cfg(test)]
+mod hash_tests {
+    use std::io::Write;
 
-impl std::io::Write for Fnv {
-    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
-        for b in buf {
-            self.0 ^= u64::from(*b);
-            self.0 = self.0.wrapping_mul(0x0100_0000_01b3);
+    #[test]
+    /// Oracle: local.rs Fnv writer at 06c1b9ae before ticket #37.
+    fn streaming_fnv_matches_previous_writer() {
+        struct Old(u64);
+        impl Write for Old {
+            fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+                for byte in bytes {
+                    self.0 = (self.0 ^ u64::from(*byte)).wrapping_mul(0x0100_0000_01b3);
+                }
+                Ok(bytes.len())
+            }
+            fn flush(&mut self) -> std::io::Result<()> {
+                Ok(())
+            }
         }
-        Ok(buf.len())
-    }
-    fn flush(&mut self) -> std::io::Result<()> {
-        Ok(())
+        let mut old = Old(0xcbf2_9ce4_8422_2325);
+        let mut new = craft_hash::Fnv64::new();
+        for bytes in [b"".as_slice(), b"abc", &[42; 4097]] {
+            old.write_all(bytes).unwrap();
+            new.write_all(bytes).unwrap();
+            assert_eq!(new.finish(), old.0);
+        }
     }
 }
 
@@ -83,7 +95,7 @@ pub fn folder_of(p: &Photo) -> Option<String> {
 impl Photo {
     /// A hash of everything about the photo except [`Photo::local_baseline`] itself.
     pub fn fingerprint(&self) -> u64 {
-        let mut h = Fnv(0xcbf2_9ce4_8422_2325);
+        let mut h = craft_hash::Fnv64::new();
         let r = if self.local_baseline.is_some() {
             let mut p = self.clone();
             p.local_baseline = None;
@@ -92,7 +104,7 @@ impl Photo {
             serde_json::to_writer(&mut h, self)
         };
         // (serialising a photo can't fail; if it ever did, no baseline would match: kept)
-        if r.is_err() { 0 } else { h.0 }
+        if r.is_err() { 0 } else { h.finish() }
     }
 
     /// Record the current state as the browse baseline (done when a browse catalogues it).

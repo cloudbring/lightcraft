@@ -18,10 +18,11 @@ matrixmultiply = { version = "=0.3.11", default-features = false, features = ["s
 web-time = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-sha2 = { workspace = true }
+craft-hash = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
+sha2 = { workspace = true }
 # tests record why they skip (`cargo xtask ci` lists the skips)
 lightcraft-testkit = { workspace = true }
 proptest = { workspace = true }

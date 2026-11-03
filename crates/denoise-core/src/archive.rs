@@ -39,18 +39,7 @@ fn u32_at(b: &[u8], at: usize) -> Option<u32> {
     Some(u32::from_le_bytes(b.get(at..at.checked_add(4)?)?.try_into().ok()?))
 }
 
-/// CRC-32 (IEEE) of `bytes`.
-fn crc32(bytes: &[u8]) -> u32 {
-    let mut table = [0u32; 256];
-    for (i, t) in table.iter_mut().enumerate() {
-        let mut c = i as u32;
-        for _ in 0..8 {
-            c = if c & 1 != 0 { 0xedb8_8320 ^ (c >> 1) } else { c >> 1 };
-        }
-        *t = c;
-    }
-    !bytes.iter().fold(!0u32, |c, &b| table[((c ^ u32::from(b)) & 0xff) as usize] ^ (c >> 8))
-}
+use craft_hash::crc32;
 
 struct Entry {
     method: u16,
@@ -165,6 +154,25 @@ pub fn extract(archive: &Path, name: &str, dest: &Path, max_bytes: u64) -> Resul
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    /// Oracle: archive.rs at 06c1b9ae before ticket #37.
+    fn crc_matches_previous_archive_implementation() {
+        fn old(bytes: &[u8]) -> u32 {
+            let mut table = [0u32; 256];
+            for (i, t) in table.iter_mut().enumerate() {
+                let mut c = i as u32;
+                for _ in 0..8 {
+                    c = if c & 1 != 0 { 0xedb8_8320 ^ (c >> 1) } else { c >> 1 };
+                }
+                *t = c;
+            }
+            !bytes.iter().fold(!0u32, |c, &b| table[((c ^ u32::from(b)) & 0xff) as usize] ^ (c >> 8))
+        }
+        for bytes in [b"".as_slice(), b"123456789", &[42; 4096]] {
+            assert_eq!(crc32(bytes), old(bytes));
+        }
+    }
 
     /// A zip with the given (name, bytes, deflate) entries, written by hand.
     pub(crate) fn make_zip(files: &[(&str, &[u8], bool)]) -> Vec<u8> {

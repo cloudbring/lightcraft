@@ -93,12 +93,7 @@ impl DevelopSettings {
     /// Stable 64-bit hash of the settings (FNV-1a over canonical JSON), for preview cache keys.
     pub fn hash64(&self) -> u64 {
         let s = serde_json::to_string(self).unwrap_or_default();
-        let mut h: u64 = 0xcbf2_9ce4_8422_2325;
-        for b in s.as_bytes() {
-            h ^= *b as u64;
-            h = h.wrapping_mul(0x0100_0000_01b3);
-        }
-        h
+        craft_hash::fnv1a64(s.as_bytes())
     }
 
     /// True if nothing differs from a fresh default (ignoring white balance "as shot" values, and
@@ -201,6 +196,15 @@ mod tests_process;
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    /// Oracle: DevelopSettings::hash64 at 06c1b9ae before ticket #37.
+    fn hash64_matches_previous_fnv() {
+        let settings = DevelopSettings::default();
+        let json = serde_json::to_string(&settings).unwrap();
+        let old = json.bytes().fold(0xcbf2_9ce4_8422_2325u64, |hash, byte| (hash ^ u64::from(byte)).wrapping_mul(0x0100_0000_01b3));
+        assert_eq!(settings.hash64(), old);
+    }
 
     #[test]
     fn serde_roundtrip_default_and_edited() {

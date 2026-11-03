@@ -113,18 +113,7 @@ pub fn from_f16(h: u16) -> f32 {
     }
 }
 
-fn crc(bytes: &[u8]) -> u32 {
-    // CRC-32 (IEEE), bitwise: strips are small and this runs once per strip
-    let mut table = [0u32; 256];
-    for (i, t) in table.iter_mut().enumerate() {
-        let mut c = i as u32;
-        for _ in 0..8 {
-            c = if c & 1 != 0 { 0xedb8_8320 ^ (c >> 1) } else { c >> 1 };
-        }
-        *t = c;
-    }
-    !bytes.iter().fold(!0u32, |c, &b| table[((c ^ u32::from(b)) & 0xff) as usize] ^ (c >> 8))
-}
+use craft_hash::crc32 as crc;
 
 /// One strip as bytes: for each plane (R, G, B) the low bytes of its half floats, then the high bytes.
 fn encode_strip(img: &Rgb32f, y0: usize, y1: usize) -> Result<Vec<u8>, ProductError> {
@@ -426,6 +415,25 @@ pub fn blend(base: &mut Rgb32f, denoised: &Rgb32f, amount: f32) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    /// Oracle: product.rs at 06c1b9ae before ticket #37.
+    fn crc_matches_previous_product_implementation() {
+        fn old(bytes: &[u8]) -> u32 {
+            let mut table = [0u32; 256];
+            for (i, t) in table.iter_mut().enumerate() {
+                let mut c = i as u32;
+                for _ in 0..8 {
+                    c = if c & 1 != 0 { 0xedb8_8320 ^ (c >> 1) } else { c >> 1 };
+                }
+                *t = c;
+            }
+            !bytes.iter().fold(!0u32, |c, &b| table[((c ^ u32::from(b)) & 0xff) as usize] ^ (c >> 8))
+        }
+        for bytes in [b"".as_slice(), b"123456789", &[42; 4096]] {
+            assert_eq!(crc(bytes), old(bytes));
+        }
+    }
 
     #[test]
     fn oversized_product_header_is_rejected_before_allocating_pixels() {
