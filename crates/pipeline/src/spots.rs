@@ -274,6 +274,10 @@ fn fill_box(src: &mut [[f32; 3]], tgt: &[[f32; 3]], alpha: &[f32], bw: usize, bh
 
 /// Apply all spots to `img` (output resolution). `ppl` = output pixels per long-edge unit.
 pub fn apply(img: &mut Rgb32f, spots: &[Spot], frame: &Frame, ppl: f64) {
+    apply_with_blur(img, spots, frame, ppl, crate::local::Blur::Legacy);
+}
+
+pub(crate) fn apply_with_blur(img: &mut Rgb32f, spots: &[Spot], frame: &Frame, ppl: f64, blur: crate::local::Blur) {
     if spots.is_empty() {
         return;
     }
@@ -347,7 +351,7 @@ pub fn apply(img: &mut Rgb32f, spots: &[Spot], frame: &Frame, ppl: f64) {
             };
             let wts = lightcraft_raster::Plane { width: bw, height: bh, data: outside };
             let sigma = (r * 0.6).max(1.0);
-            let (bd, bm) = (lightcraft_raster::blur::gaussian(&diff, sigma), lightcraft_raster::blur::gaussian(&wts, sigma));
+            let (bd, bm) = (blur.gaussian(&diff, sigma), blur.gaussian(&wts, sigma));
             Some(Rgb32f {
                 width: bw,
                 height: bh,

@@ -1,4 +1,6 @@
-//! Gaussian-like blur by three successive box filters (running sums, O(1) per pixel per pass).
+//! Separable Gaussian blur: variance-exact sampled windows below 2.5 px, otherwise a
+//! third-order Young–van Vliet recursive filter with Triggs–Sdika clamp boundaries.
+//! [`gaussian_box`] preserves the legacy process and the GPU's three-box approximation.
 
 use crate::resample::Pixel;
 use crate::{Image, par_rows};
@@ -54,7 +56,7 @@ pub fn box_radii(sigma: f32) -> [usize; 3] {
     std::array::from_fn(|i| (((if (i as i32) < m { wl } else { wu }) - 1) / 2).max(0) as usize)
 }
 
-/// Standard deviation (px) of the blur [`gaussian`] actually makes for `sigma`: its boxes are
+/// Standard deviation (px) of the blur [`gaussian_box`] actually makes for `sigma`: its boxes are
 /// whole pixels wide, so small radii snap to a few steps (0 below about 0.58 px, then √(2/3) px for one
 /// 3-px box per axis, …).
 pub fn box_sigma(sigma: f32) -> f32 {
@@ -118,7 +120,7 @@ fn box_v<T: Pixel>(src: &Image<T>, dst: &mut Image<T>, r: usize) {
     });
 }
 
-/// The box radii of [`gaussian`] on a `w × h` image (the GPU renderer's twin uses them too), or
+/// The box radii of [`gaussian_box`] on a `w × h` image (the GPU renderer's twin uses them too), or
 /// `None` when the blur leaves the image as it is: `sigma` at most 0.3 or not a number, or an
 /// empty image. A sigma wider than twice the image's long side counts as that: a crop a hair
 /// wide shown to fit asked the tone and dehaze stages for sigmas of millions of pixels (infinite
@@ -132,7 +134,7 @@ pub fn radii_for(sigma: f32, w: usize, h: usize) -> Option<[usize; 3]> {
 }
 
 /// Blur with Gaussian `sigma` (pixels). `sigma <= 0.3` returns a copy.
-pub fn gaussian<T: Pixel>(img: &Image<T>, sigma: f32) -> Image<T> {
+pub fn gaussian_box<T: Pixel>(img: &Image<T>, sigma: f32) -> Image<T> {
     let Some(radii) = radii_for(sigma, img.width, img.height) else {
         return img.clone();
     };
@@ -153,6 +155,160 @@ pub fn gaussian<T: Pixel>(img: &Image<T>, sigma: f32) -> Image<T> {
     }
     a
 }
+
+/// Precomputed one-dimensional Gaussian. Native pixels use f64 recurrence state and scratch;
+/// the default [`Pixel::gaussian_line`] keeps external pixel implementations source-compatible.
+pub struct Gaussian {
+    sigma: f32,
+    kernel: Option<Vec<f32>>,
+    feedback: [f64; 3],
+    gain: f64,
+    boundary: [[f64; 3]; 3],
+}
+
+impl Gaussian {
+    fn new(sigma: f32) -> Self {
+        let sigma64 = f64::from(sigma);
+        let mut q = if sigma64 < 3.556 { -0.2568 + 0.5784 * sigma64 + 0.0561 * sigma64 * sigma64 } else { 2.5091 + 0.9804 * (sigma64 - 3.556) };
+        let (real, pair, imaginary) = (1.16680_f64, 1.10783_f64, 1.40586_f64);
+        let norm = pair * pair + imaginary * imaginary;
+        let linear = 2.0 * (1.0 / real + 2.0 * pair / norm);
+        let quadratic = 2.0 * (1.0 / (real * real) + 2.0 * (pair * pair - imaginary * imaginary) / (norm * norm));
+        for _ in 0..5 {
+            q -= (q * (quadratic * q + linear) - sigma64 * sigma64) / (2.0 * quadratic * q + linear);
+        }
+        let denominator = (q + real) * ((q + pair).powi(2) + imaginary * imaginary);
+        let feedback = [
+            q * ((q + pair).powi(2) + imaginary * imaginary + 2.0 * (q + real) * (q + pair)) / denominator,
+            -q * q * (3.0 * q + real + 2.0 * pair) / denominator,
+            q.powi(3) / denominator,
+        ];
+        let gain = real * norm / denominator;
+        let [first, second, third] = feedback;
+        let scale = 1.0 / ((1.0 + first - second + third) * gain * (1.0 + second + (first - third) * third));
+        let boundary = [
+            [1.0 - second - third * (first + third), (first + third) * (second + first * third), third * (first + second * third)],
+            [first + second * third, (1.0 - second) * (second + first * third), third * (1.0 - second - third * (first + third))],
+            [
+                first * (first + third) + second * (1.0 - second),
+                first * (second - third * third) + third * (1.0 + second * (second - 1.0) - third * third),
+                third * (first + second * third),
+            ],
+        ]
+        .map(|row| row.map(|value| value * scale * gain));
+        Self { sigma, kernel: (sigma < 2.5).then(|| variance_exact_kernel(sigma)).flatten(), feedback, gain, boundary }
+    }
+
+    /// Compatibility implementation for custom pixel types; built-in floating pixels override
+    /// this hook to retain all recurrence state in f64.
+    pub fn filter_pixels<T: Pixel>(&self, line: &mut [T]) {
+        let mut scratch = Vec::new();
+        for radius in box_radii(self.sigma) {
+            box_row(line, &mut scratch, radius);
+        }
+    }
+
+    /// Filter one line with f64 state, converting a custom pixel to and from fixed-size channels.
+    /// Implement [`Pixel::gaussian_line`] with this method to opt a custom pixel into the new path.
+    pub fn filter<const CHANNELS: usize, T: Copy>(
+        &self,
+        line: &mut [T],
+        widen: impl Fn(T) -> [f64; CHANNELS],
+        narrow: impl Fn([f64; CHANNELS]) -> T,
+    ) {
+        let Some((&left, &right)) = line.first().zip(line.last()) else { return };
+        if let Some(kernel) = &self.kernel {
+            let half = kernel.len() / 2;
+            let mut source = vec![widen(left); half];
+            source.extend(line.iter().copied().map(&widen));
+            source.extend(std::iter::repeat_n(widen(right), half));
+            let mut values = vec![[0.0; CHANNELS]; line.len()];
+            for (tap, &weight) in kernel.iter().enumerate() {
+                for (value, sample) in values.iter_mut().zip(&source[tap..]) {
+                    for channel in 0..CHANNELS {
+                        value[channel] += sample[channel] * f64::from(weight);
+                    }
+                }
+            }
+            for (pixel, value) in line.iter_mut().zip(values) {
+                *pixel = narrow(value);
+            }
+            return;
+        }
+        let left = widen(left);
+        let right = widen(right);
+        let mut state = [[0.0; CHANNELS]; 3];
+        let mut forward = Vec::with_capacity(line.len());
+        for &pixel in line.iter() {
+            let input = widen(pixel);
+            let value = std::array::from_fn(|channel| {
+                self.gain * (input[channel] - left[channel])
+                    + self.feedback[0] * state[0][channel]
+                    + self.feedback[1] * state[1][channel]
+                    + self.feedback[2] * state[2][channel]
+            });
+            state = [value, state[0], state[1]];
+            forward.push(value);
+        }
+        let mut future: [[f64; CHANNELS]; 3] = self.boundary.map(|row| {
+            std::array::from_fn(|channel| {
+                row.iter().zip(&state).map(|(coefficient, past)| coefficient * (past[channel] + left[channel] - right[channel])).sum::<f64>()
+            })
+        });
+        if let Some(last) = line.last_mut() {
+            *last = narrow(std::array::from_fn(|channel| future[0][channel] + right[channel]));
+        }
+        let count = line.len().saturating_sub(1);
+        for (pixel, input) in line[..count].iter_mut().zip(&forward[..count]).rev() {
+            let value = std::array::from_fn(|channel| {
+                self.gain * (input[channel] + left[channel] - right[channel])
+                    + self.feedback[0] * future[0][channel]
+                    + self.feedback[1] * future[1][channel]
+                    + self.feedback[2] * future[2][channel]
+            });
+            *pixel = narrow(std::array::from_fn(|channel| value[channel] + right[channel]));
+            future = [value, future[0], future[1]];
+        }
+    }
+}
+
+fn transpose<T: Pixel>(source: &Image<T>, destination: &mut Image<T>) {
+    const TILE: usize = 32;
+    let width = destination.width;
+    par_rows(&mut destination.data, width.saturating_mul(TILE), |band, rows| {
+        for start in (0..width).step_by(TILE) {
+            let end = (start + TILE).min(width);
+            for (offset, row) in rows.chunks_mut(width).enumerate() {
+                let column = band * TILE + offset;
+                for (index, pixel) in row.iter_mut().enumerate().take(end).skip(start) {
+                    *pixel = source.data[index * source.width + column];
+                }
+            }
+        }
+    });
+}
+
+/// Blur built-in floating pixels with Gaussian `sigma` (pixels), clamping outside the edges.
+/// Custom pixels keep legacy filtering unless they override [`Pixel::gaussian_line`].
+/// Non-positive/NaN sigmas and empty images return a copy; huge/infinite sigmas are bounded.
+pub fn gaussian<T: Pixel>(img: &Image<T>, sigma: f32) -> Image<T> {
+    if sigma.is_nan() || sigma <= 0.0 || img.width == 0 || img.height == 0 {
+        return img.clone();
+    }
+    let sigma = sigma.min(MAX_SIGMA).min((img.width.max(img.height) as f32 * 2.0).max(1.0));
+    let filter = Gaussian::new(sigma);
+    let mut horizontal = img.clone();
+    par_rows(&mut horizontal.data, img.width, |_, row| T::gaussian_line(row, &filter));
+    let mut transposed = Image::<T>::new(img.height, img.width);
+    transpose(&horizontal, &mut transposed);
+    par_rows(&mut transposed.data, img.height, |_, line| T::gaussian_line(line, &filter));
+    transpose(&transposed, &mut horizontal);
+    horizontal
+}
+
+#[cfg(test)]
+#[path = "blur_tests.rs"]
+mod accuracy_tests;
 
 #[cfg(test)]
 mod tests {
@@ -246,7 +402,7 @@ mod tests {
         for sigma in [1.0f32, 2.5, 8.0] {
             let mut imp = Image::<f32>::new(201, 1);
             imp.set(100, 0, 1.0);
-            let b = gaussian(&imp, sigma);
+            let b = gaussian_box(&imp, sigma);
             let var: f32 = b.data.iter().enumerate().map(|(i, v)| v * ((i as f32 - 100.0).powi(2))).sum();
             assert!((var.sqrt() - box_sigma(sigma)).abs() < 1e-3, "{sigma}: {} vs {}", var.sqrt(), box_sigma(sigma));
         }

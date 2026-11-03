@@ -83,9 +83,18 @@ pub fn weights(src: usize, dst: usize, filter: Filter) -> Vec<(usize, Vec<f32>)>
 pub trait Pixel: Copy + Default + Send + Sync {
     fn zero() -> Self;
     fn madd(self, o: Self, w: f32) -> Self;
+
+    /// Gaussian line hook. The default preserves legacy custom-pixel behaviour; floating pixels
+    /// use [`crate::blur::Gaussian::filter`] with f64 state instead.
+    fn gaussian_line(line: &mut [Self], filter: &crate::blur::Gaussian) {
+        filter.filter_pixels(line);
+    }
 }
 
 impl Pixel for f32 {
+    fn gaussian_line(line: &mut [Self], filter: &crate::blur::Gaussian) {
+        filter.filter(line, |value| [f64::from(value)], |[value]| value as f32);
+    }
     fn zero() -> Self {
         0.0
     }
@@ -96,6 +105,9 @@ impl Pixel for f32 {
 }
 
 impl Pixel for [f32; 3] {
+    fn gaussian_line(line: &mut [Self], filter: &crate::blur::Gaussian) {
+        filter.filter(line, |value| value.map(f64::from), |value| value.map(|channel| channel as f32));
+    }
     fn zero() -> Self {
         [0.0; 3]
     }
@@ -106,6 +118,9 @@ impl Pixel for [f32; 3] {
 }
 
 impl Pixel for [f32; 4] {
+    fn gaussian_line(line: &mut [Self], filter: &crate::blur::Gaussian) {
+        filter.filter(line, |value| value.map(f64::from), |value| value.map(|channel| channel as f32));
+    }
     fn zero() -> Self {
         [0.0; 4]
     }
