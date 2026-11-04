@@ -1,0 +1,844 @@
+{
+  "craft_bench_report": {
+    "aggregate": {
+      "cpu": {
+        "ci_hi": 0.6719188344965145,
+        "ci_lo": 0.6651185580132744,
+        "point": 0.6673269958822196
+      },
+      "inputs": 2,
+      "wall": {
+        "ci_hi": 0.6746767713014664,
+        "ci_lo": 0.6635119904418036,
+        "point": 0.6670996112510769
+      }
+    },
+    "config": {
+      "cpu_time": "process",
+      "output_checked": true,
+      "requested_repetitions": 20,
+      "resamples": 2000,
+      "runs_per_side": 20,
+      "seed": 12648430,
+      "warmup_runs": 2
+    },
+    "contended": false,
+    "fingerprint": {
+      "arch": "aarch64",
+      "cpu_model": "Apple M6",
+      "date": "2026-11-04T23:28:49+00:00",
+      "debug_assertions": false,
+      "kernel": "Darwin 27.0.0",
+      "logical_cores": 12,
+      "opt_level": "3",
+      "os": "macos",
+      "physical_cores": 12,
+      "profile": "release",
+      "ram_bytes": 34359738368,
+      "rustc": "rustc 1.99.0 (b940084d7 2026-09-28) (Homebrew)"
+    },
+    "guard": {
+      "contended": false,
+      "load_after": 3.24,
+      "load_before": 3.1,
+      "load_threshold": 6.0,
+      "logical_cores": 12,
+      "max_load_per_core": 0.5,
+      "reasons": [],
+      "throttle_after": {
+        "speed_limit_pct": null,
+        "throttle_count": null
+      },
+      "throttle_before": {
+        "speed_limit_pct": null,
+        "throttle_count": null
+      }
+    },
+    "inputs": [
+      {
+        "cpu": {
+          "new": {
+            "mad_ns": 336500.0,
+            "max_ns": 89908000.0,
+            "median_ns": 70902500.0,
+            "min_ns": 70549000.0,
+            "n": 20
+          },
+          "old": {
+            "mad_ns": 312000.0,
+            "max_ns": 109074000.0,
+            "median_ns": 106313000.0,
+            "min_ns": 105619000.0,
+            "n": 20
+          },
+          "ratio": {
+            "ci_hi": 0.6759386377877945,
+            "ci_lo": 0.6631731943995843,
+            "point": 0.6669222014240967
+          }
+        },
+        "name": "synthetic 6000x4000",
+        "wall": {
+          "new": {
+            "mad_ns": 300125.5,
+            "max_ns": 91488625.0,
+            "median_ns": 70996979.5,
+            "min_ns": 70696625.0,
+            "n": 20
+          },
+          "old": {
+            "mad_ns": 475458.0,
+            "max_ns": 109891042.0,
+            "median_ns": 106667249.5,
+            "min_ns": 105716416.0,
+            "n": 20
+          },
+          "ratio": {
+            "ci_hi": 0.6811823259167213,
+            "ci_lo": 0.6596456063188435,
+            "point": 0.6655930459704973
+          }
+        }
+      },
+      {
+        "cpu": {
+          "new": {
+            "mad_ns": 192500.0,
+            "max_ns": 72828000.0,
+            "median_ns": 70824000.0,
+            "min_ns": 70313000.0,
+            "n": 20
+          },
+          "old": {
+            "mad_ns": 249500.0,
+            "max_ns": 110627000.0,
+            "median_ns": 106066500.0,
+            "min_ns": 105733000.0,
+            "n": 20
+          },
+          "ratio": {
+            "ci_hi": 0.6693383372151135,
+            "ci_lo": 0.6653874935157355,
+            "point": 0.6677320360339976
+          }
+        },
+        "name": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "wall": {
+          "new": {
+            "mad_ns": 249312.5,
+            "max_ns": 73386500.0,
+            "median_ns": 71086083.5,
+            "min_ns": 70456667.0,
+            "n": 20
+          },
+          "old": {
+            "mad_ns": 240501.0,
+            "max_ns": 111540667.0,
+            "median_ns": 106319270.5,
+            "min_ns": 105867208.0,
+            "n": 20
+          },
+          "ratio": {
+            "ci_hi": 0.6701697911197961,
+            "ci_lo": 0.6653038384189853,
+            "point": 0.6686095866318045
+          }
+        }
+      }
+    ],
+    "name": "lightcraft CPU gaussian sigma=64, 6000x4000 plane, rayon threads 1",
+    "publishable": true,
+    "revs": {
+      "new": "39aa4d256939c3703f1e22c0f2a715a4c98a189f",
+      "old": "06c1b9ae0775464ce83ef0a9588be770337600f1"
+    },
+    "runs": [
+      {
+        "cpu_ns": 70313000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 0,
+        "side": "new",
+        "wall_ns": 70456667
+      },
+      {
+        "cpu_ns": 105749000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 1,
+        "side": "old",
+        "wall_ns": 105974625
+      },
+      {
+        "cpu_ns": 106370000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 2,
+        "side": "old",
+        "wall_ns": 106611959
+      },
+      {
+        "cpu_ns": 70832000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 3,
+        "side": "new",
+        "wall_ns": 71032334
+      },
+      {
+        "cpu_ns": 106082000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 4,
+        "side": "old",
+        "wall_ns": 106289334
+      },
+      {
+        "cpu_ns": 70782000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 5,
+        "side": "new",
+        "wall_ns": 70944750
+      },
+      {
+        "cpu_ns": 70714000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 6,
+        "side": "new",
+        "wall_ns": 70858458
+      },
+      {
+        "cpu_ns": 106051000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 7,
+        "side": "old",
+        "wall_ns": 106347958
+      },
+      {
+        "cpu_ns": 70568000,
+        "input": "synthetic 6000x4000",
+        "order": 8,
+        "side": "new",
+        "wall_ns": 70734417
+      },
+      {
+        "cpu_ns": 106033000,
+        "input": "synthetic 6000x4000",
+        "order": 9,
+        "side": "old",
+        "wall_ns": 106347542
+      },
+      {
+        "cpu_ns": 106296000,
+        "input": "synthetic 6000x4000",
+        "order": 10,
+        "side": "old",
+        "wall_ns": 106541417
+      },
+      {
+        "cpu_ns": 70743000,
+        "input": "synthetic 6000x4000",
+        "order": 11,
+        "side": "new",
+        "wall_ns": 70921667
+      },
+      {
+        "cpu_ns": 70549000,
+        "input": "synthetic 6000x4000",
+        "order": 12,
+        "side": "new",
+        "wall_ns": 70697083
+      },
+      {
+        "cpu_ns": 105936000,
+        "input": "synthetic 6000x4000",
+        "order": 13,
+        "side": "old",
+        "wall_ns": 106095458
+      },
+      {
+        "cpu_ns": 106479000,
+        "input": "synthetic 6000x4000",
+        "order": 14,
+        "side": "old",
+        "wall_ns": 106864375
+      },
+      {
+        "cpu_ns": 70963000,
+        "input": "synthetic 6000x4000",
+        "order": 15,
+        "side": "new",
+        "wall_ns": 71038959
+      },
+      {
+        "cpu_ns": 70443000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 16,
+        "side": "new",
+        "wall_ns": 70543166
+      },
+      {
+        "cpu_ns": 106091000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 17,
+        "side": "old",
+        "wall_ns": 106197125
+      },
+      {
+        "cpu_ns": 105769000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 18,
+        "side": "old",
+        "wall_ns": 105867208
+      },
+      {
+        "cpu_ns": 70432000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 19,
+        "side": "new",
+        "wall_ns": 70497417
+      },
+      {
+        "cpu_ns": 71584000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 20,
+        "side": "new",
+        "wall_ns": 71642125
+      },
+      {
+        "cpu_ns": 107159000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 21,
+        "side": "old",
+        "wall_ns": 107886917
+      },
+      {
+        "cpu_ns": 107196000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 22,
+        "side": "old",
+        "wall_ns": 108181667
+      },
+      {
+        "cpu_ns": 71309000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 23,
+        "side": "new",
+        "wall_ns": 71816875
+      },
+      {
+        "cpu_ns": 106330000,
+        "input": "synthetic 6000x4000",
+        "order": 24,
+        "side": "old",
+        "wall_ns": 106849334
+      },
+      {
+        "cpu_ns": 71851000,
+        "input": "synthetic 6000x4000",
+        "order": 25,
+        "side": "new",
+        "wall_ns": 72474375
+      },
+      {
+        "cpu_ns": 71867000,
+        "input": "synthetic 6000x4000",
+        "order": 26,
+        "side": "new",
+        "wall_ns": 72683958
+      },
+      {
+        "cpu_ns": 107148000,
+        "input": "synthetic 6000x4000",
+        "order": 27,
+        "side": "old",
+        "wall_ns": 108258916
+      },
+      {
+        "cpu_ns": 107118000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 28,
+        "side": "old",
+        "wall_ns": 108161375
+      },
+      {
+        "cpu_ns": 71654000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 29,
+        "side": "new",
+        "wall_ns": 72387542
+      },
+      {
+        "cpu_ns": 70833000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 30,
+        "side": "new",
+        "wall_ns": 71197917
+      },
+      {
+        "cpu_ns": 105979000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 31,
+        "side": "old",
+        "wall_ns": 106290583
+      },
+      {
+        "cpu_ns": 106038000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 32,
+        "side": "old",
+        "wall_ns": 106486333
+      },
+      {
+        "cpu_ns": 70912000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 33,
+        "side": "new",
+        "wall_ns": 71139833
+      },
+      {
+        "cpu_ns": 70625000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 34,
+        "side": "new",
+        "wall_ns": 70844500
+      },
+      {
+        "cpu_ns": 105829000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 35,
+        "side": "old",
+        "wall_ns": 106173083
+      },
+      {
+        "cpu_ns": 70816000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 36,
+        "side": "new",
+        "wall_ns": 71181500
+      },
+      {
+        "cpu_ns": 105931000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 37,
+        "side": "old",
+        "wall_ns": 106274709
+      },
+      {
+        "cpu_ns": 107374000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 38,
+        "side": "old",
+        "wall_ns": 108281333
+      },
+      {
+        "cpu_ns": 72828000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 39,
+        "side": "new",
+        "wall_ns": 73386500
+      },
+      {
+        "cpu_ns": 73562000,
+        "input": "synthetic 6000x4000",
+        "order": 40,
+        "side": "new",
+        "wall_ns": 74349083
+      },
+      {
+        "cpu_ns": 108877000,
+        "input": "synthetic 6000x4000",
+        "order": 41,
+        "side": "old",
+        "wall_ns": 109891042
+      },
+      {
+        "cpu_ns": 109074000,
+        "input": "synthetic 6000x4000",
+        "order": 42,
+        "side": "old",
+        "wall_ns": 109743792
+      },
+      {
+        "cpu_ns": 72792000,
+        "input": "synthetic 6000x4000",
+        "order": 43,
+        "side": "new",
+        "wall_ns": 73285458
+      },
+      {
+        "cpu_ns": 73157000,
+        "input": "synthetic 6000x4000",
+        "order": 44,
+        "side": "new",
+        "wall_ns": 74050333
+      },
+      {
+        "cpu_ns": 108247000,
+        "input": "synthetic 6000x4000",
+        "order": 45,
+        "side": "old",
+        "wall_ns": 109250625
+      },
+      {
+        "cpu_ns": 108228000,
+        "input": "synthetic 6000x4000",
+        "order": 46,
+        "side": "old",
+        "wall_ns": 109324833
+      },
+      {
+        "cpu_ns": 71073000,
+        "input": "synthetic 6000x4000",
+        "order": 47,
+        "side": "new",
+        "wall_ns": 71539166
+      },
+      {
+        "cpu_ns": 106302000,
+        "input": "synthetic 6000x4000",
+        "order": 48,
+        "side": "old",
+        "wall_ns": 106750458
+      },
+      {
+        "cpu_ns": 84917000,
+        "input": "synthetic 6000x4000",
+        "order": 49,
+        "side": "new",
+        "wall_ns": 87792625
+      },
+      {
+        "cpu_ns": 89908000,
+        "input": "synthetic 6000x4000",
+        "order": 50,
+        "side": "new",
+        "wall_ns": 91488625
+      },
+      {
+        "cpu_ns": 107345000,
+        "input": "synthetic 6000x4000",
+        "order": 51,
+        "side": "old",
+        "wall_ns": 108378542
+      },
+      {
+        "cpu_ns": 71246000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 52,
+        "side": "new",
+        "wall_ns": 71391917
+      },
+      {
+        "cpu_ns": 105733000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 53,
+        "side": "old",
+        "wall_ns": 105934500
+      },
+      {
+        "cpu_ns": 106328000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 54,
+        "side": "old",
+        "wall_ns": 106619333
+      },
+      {
+        "cpu_ns": 70797000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 55,
+        "side": "new",
+        "wall_ns": 70961167
+      },
+      {
+        "cpu_ns": 106030000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 56,
+        "side": "old",
+        "wall_ns": 106185917
+      },
+      {
+        "cpu_ns": 70676000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 57,
+        "side": "new",
+        "wall_ns": 70829042
+      },
+      {
+        "cpu_ns": 71012000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 58,
+        "side": "new",
+        "wall_ns": 71161167
+      },
+      {
+        "cpu_ns": 106225000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 59,
+        "side": "old",
+        "wall_ns": 106507584
+      },
+      {
+        "cpu_ns": 110627000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 60,
+        "side": "old",
+        "wall_ns": 111540667
+      },
+      {
+        "cpu_ns": 70956000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 61,
+        "side": "new",
+        "wall_ns": 71237542
+      },
+      {
+        "cpu_ns": 70627000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 62,
+        "side": "new",
+        "wall_ns": 70770542
+      },
+      {
+        "cpu_ns": 106030000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 63,
+        "side": "old",
+        "wall_ns": 106198958
+      },
+      {
+        "cpu_ns": 70830000,
+        "input": "synthetic 6000x4000",
+        "order": 64,
+        "side": "new",
+        "wall_ns": 70903791
+      },
+      {
+        "cpu_ns": 105619000,
+        "input": "synthetic 6000x4000",
+        "order": 65,
+        "side": "old",
+        "wall_ns": 105716416
+      },
+      {
+        "cpu_ns": 106324000,
+        "input": "synthetic 6000x4000",
+        "order": 66,
+        "side": "old",
+        "wall_ns": 106584041
+      },
+      {
+        "cpu_ns": 71258000,
+        "input": "synthetic 6000x4000",
+        "order": 67,
+        "side": "new",
+        "wall_ns": 71328500
+      },
+      {
+        "cpu_ns": 106096000,
+        "input": "synthetic 6000x4000",
+        "order": 68,
+        "side": "old",
+        "wall_ns": 106228916
+      },
+      {
+        "cpu_ns": 70656000,
+        "input": "synthetic 6000x4000",
+        "order": 69,
+        "side": "new",
+        "wall_ns": 70716292
+      },
+      {
+        "cpu_ns": 70643000,
+        "input": "synthetic 6000x4000",
+        "order": 70,
+        "side": "new",
+        "wall_ns": 70858209
+      },
+      {
+        "cpu_ns": 105873000,
+        "input": "synthetic 6000x4000",
+        "order": 71,
+        "side": "old",
+        "wall_ns": 106079875
+      },
+      {
+        "cpu_ns": 106599000,
+        "input": "synthetic 6000x4000",
+        "order": 72,
+        "side": "old",
+        "wall_ns": 106986458
+      },
+      {
+        "cpu_ns": 70842000,
+        "input": "synthetic 6000x4000",
+        "order": 73,
+        "side": "new",
+        "wall_ns": 70955000
+      },
+      {
+        "cpu_ns": 70784000,
+        "input": "synthetic 6000x4000",
+        "order": 74,
+        "side": "new",
+        "wall_ns": 70952958
+      },
+      {
+        "cpu_ns": 105975000,
+        "input": "synthetic 6000x4000",
+        "order": 75,
+        "side": "old",
+        "wall_ns": 106154667
+      },
+      {
+        "cpu_ns": 70564000,
+        "input": "synthetic 6000x4000",
+        "order": 76,
+        "side": "new",
+        "wall_ns": 70696625
+      },
+      {
+        "cpu_ns": 106028000,
+        "input": "synthetic 6000x4000",
+        "order": 77,
+        "side": "old",
+        "wall_ns": 106277500
+      },
+      {
+        "cpu_ns": 106093000,
+        "input": "synthetic 6000x4000",
+        "order": 78,
+        "side": "old",
+        "wall_ns": 106366791
+      },
+      {
+        "cpu_ns": 70613000,
+        "input": "synthetic 6000x4000",
+        "order": 79,
+        "side": "new",
+        "wall_ns": 70773125
+      }
+    ],
+    "schema_version": 1
+  },
+  "label": "C11-gaussian-sigma64-1thread",
+  "meta": {
+    "accuracy_vs_f64_reference": [
+      {
+        "crop": "512x512 of real mosaic",
+        "new_recursive": {
+          "max_abs_err": 0.0008905248937592369,
+          "mean_abs_err": 0.000038653752077587426
+        },
+        "old_boxes": {
+          "max_abs_err": 0.135100428676095,
+          "mean_abs_err": 0.004134091080318138
+        },
+        "sigma": 1.0
+      },
+      {
+        "crop": "512x512 of real mosaic",
+        "new_recursive": {
+          "max_abs_err": 0.029069381559032048,
+          "mean_abs_err": 0.002300287925125493
+        },
+        "old_boxes": {
+          "max_abs_err": 0.12057799941635705,
+          "mean_abs_err": 0.0012584962730382507
+        },
+        "sigma": 8.0
+      },
+      {
+        "crop": "512x512 of real mosaic",
+        "new_recursive": {
+          "max_abs_err": 0.010986871320377789,
+          "mean_abs_err": 0.001925829453714789
+        },
+        "old_boxes": {
+          "max_abs_err": 0.08021669623527317,
+          "mean_abs_err": 0.0026372005195275626
+        },
+        "sigma": 64.0
+      }
+    ],
+    "claim": "C11 Gaussian 1.4-1.6x at sigma>=8 (24 MP, single thread; boxes -> recursive)",
+    "equality": "NOT bit-equal by design: new gaussian is variance-exact (#176). Checked instead: new gaussian_box == old gaussian bitwise (all inputs/sigmas), and accuracy vs an f64 direct convolution (below)",
+    "legacy_equality": [
+      {
+        "input": "synthetic 6000x4000",
+        "new_gaussian_box_bit_identical_to_old_gaussian": true,
+        "sigma": 1.0
+      },
+      {
+        "input": "synthetic 6000x4000",
+        "new_gaussian_box_bit_identical_to_old_gaussian": true,
+        "sigma": 8.0
+      },
+      {
+        "input": "synthetic 6000x4000",
+        "new_gaussian_box_bit_identical_to_old_gaussian": true,
+        "sigma": 64.0
+      },
+      {
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "new_gaussian_box_bit_identical_to_old_gaussian": true,
+        "sigma": 1.0
+      },
+      {
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "new_gaussian_box_bit_identical_to_old_gaussian": true,
+        "sigma": 8.0
+      },
+      {
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "new_gaussian_box_bit_identical_to_old_gaussian": true,
+        "sigma": 64.0
+      }
+    ],
+    "output_checked_in_craft_bench": "no-op closure; checks are out-of-band",
+    "rayon_threads": "1"
+  },
+  "summary": {
+    "ci_excludes_1": true,
+    "contended": false,
+    "cpu_speedup_geomean": {
+      "ci_hi": 1.503491351958401,
+      "ci_lo": 1.4882749949245357,
+      "point": 1.4985157294258418
+    },
+    "direction": "faster",
+    "inputs": 2,
+    "load_after": 3.24,
+    "load_before": 3.1,
+    "logical_cores": 12,
+    "per_input": [
+      {
+        "cpu_speedup": {
+          "ci_hi": 1.507901719256563,
+          "ci_lo": 1.4794242318693165,
+          "point": 1.4994252670921335
+        },
+        "input": "synthetic 6000x4000",
+        "wall_speedup": {
+          "ci_hi": 1.5159655281879407,
+          "ci_lo": 1.4680357401437572,
+          "point": 1.5024195430736598
+        }
+      },
+      {
+        "cpu_speedup": {
+          "ci_hi": 1.502883672664568,
+          "ci_lo": 1.494012735264285,
+          "point": 1.4976067434767875
+        },
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "wall_speedup": {
+          "ci_hi": 1.5030726447879512,
+          "ci_lo": 1.4921591710797437,
+          "point": 1.4956411334716448
+        }
+      }
+    ],
+    "publishable": true,
+    "wall_speedup_geomean": {
+      "ci_hi": 1.5071317691397614,
+      "ci_lo": 1.4821912396227572,
+      "point": 1.4990265068879334
+    }
+  }
+}

@@ -1,0 +1,1799 @@
+{
+  "craft_bench_report": {
+    "aggregate": {
+      "cpu": {
+        "ci_hi": 1.0524644076090715,
+        "ci_lo": 0.9416074279605817,
+        "point": 1.0037136680987708
+      },
+      "inputs": 5,
+      "wall": {
+        "ci_hi": 0.6198108700864052,
+        "ci_lo": 0.6103048891498148,
+        "point": 0.6166723257678106
+      }
+    },
+    "config": {
+      "cpu_time": "process",
+      "output_checked": true,
+      "requested_repetitions": 20,
+      "resamples": 2000,
+      "runs_per_side": 20,
+      "seed": 12648430,
+      "warmup_runs": 2
+    },
+    "contended": false,
+    "fingerprint": {
+      "arch": "aarch64",
+      "cpu_model": "Apple M6",
+      "date": "2026-11-04T23:28:13+00:00",
+      "debug_assertions": false,
+      "kernel": "Darwin 27.0.0",
+      "logical_cores": 12,
+      "opt_level": "3",
+      "os": "macos",
+      "physical_cores": 12,
+      "profile": "release",
+      "ram_bytes": 34359738368,
+      "rustc": "rustc 1.99.0 (b940084d7 2026-09-28) (Homebrew)"
+    },
+    "guard": {
+      "contended": false,
+      "load_after": 3.2,
+      "load_before": 3.39,
+      "load_threshold": 6.0,
+      "logical_cores": 12,
+      "max_load_per_core": 0.5,
+      "reasons": [],
+      "throttle_after": {
+        "speed_limit_pct": null,
+        "throttle_count": null
+      },
+      "throttle_before": {
+        "speed_limit_pct": null,
+        "throttle_count": null
+      }
+    },
+    "inputs": [
+      {
+        "cpu": {
+          "new": {
+            "mad_ns": 11500.0,
+            "max_ns": 366000.0,
+            "median_ns": 131000.0,
+            "min_ns": 104000.0,
+            "n": 20
+          },
+          "old": {
+            "mad_ns": 10500.0,
+            "max_ns": 178000.0,
+            "median_ns": 131000.0,
+            "min_ns": 105000.0,
+            "n": 20
+          },
+          "ratio": {
+            "ci_hi": 1.131366607541716,
+            "ci_lo": 0.9236641221374046,
+            "point": 1.0
+          }
+        },
+        "name": "synthetic 6000x4000",
+        "wall": {
+          "new": {
+            "mad_ns": 32625.0,
+            "max_ns": 9565917.0,
+            "median_ns": 8778250.0,
+            "min_ns": 8705917.0,
+            "n": 20
+          },
+          "old": {
+            "mad_ns": 24375.0,
+            "max_ns": 15495834.0,
+            "median_ns": 15322208.5,
+            "min_ns": 15278708.0,
+            "n": 20
+          },
+          "ratio": {
+            "ci_hi": 0.5746920395329679,
+            "ci_lo": 0.5705822058066038,
+            "point": 0.5729102302713085
+          }
+        }
+      },
+      {
+        "cpu": {
+          "new": {
+            "mad_ns": 8500.0,
+            "max_ns": 182000.0,
+            "median_ns": 122000.0,
+            "min_ns": 92000.0,
+            "n": 20
+          },
+          "old": {
+            "mad_ns": 7000.0,
+            "max_ns": 169000.0,
+            "median_ns": 122000.0,
+            "min_ns": 103000.0,
+            "n": 20
+          },
+          "ratio": {
+            "ci_hi": 1.0826086956521739,
+            "ci_lo": 0.9227642276422764,
+            "point": 1.0
+          }
+        },
+        "name": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "wall": {
+          "new": {
+            "mad_ns": 18625.5,
+            "max_ns": 8814417.0,
+            "median_ns": 8747208.5,
+            "min_ns": 8715834.0,
+            "n": 20
+          },
+          "old": {
+            "mad_ns": 18750.0,
+            "max_ns": 15379917.0,
+            "median_ns": 15309666.5,
+            "min_ns": 15266500.0,
+            "n": 20
+          },
+          "ratio": {
+            "ci_hi": 0.5728097617945922,
+            "ci_lo": 0.5703571979782892,
+            "point": 0.5713519951593982
+          }
+        }
+      },
+      {
+        "cpu": {
+          "new": {
+            "mad_ns": 10000.0,
+            "max_ns": 139000.0,
+            "median_ns": 108000.0,
+            "min_ns": 89000.0,
+            "n": 20
+          },
+          "old": {
+            "mad_ns": 9000.0,
+            "max_ns": 145000.0,
+            "median_ns": 105000.0,
+            "min_ns": 83000.0,
+            "n": 20
+          },
+          "ratio": {
+            "ci_hi": 1.1095238095238096,
+            "ci_lo": 0.9147982062780269,
+            "point": 1.0285714285714285
+          }
+        },
+        "name": "real photo 09a31661b076 native 2048x1365",
+        "wall": {
+          "new": {
+            "mad_ns": 20895.5,
+            "max_ns": 1230208.0,
+            "median_ns": 1183812.5,
+            "min_ns": 1147291.0,
+            "n": 20
+          },
+          "old": {
+            "mad_ns": 10666.5,
+            "max_ns": 2012666.0,
+            "median_ns": 1969375.0,
+            "min_ns": 1941667.0,
+            "n": 20
+          },
+          "ratio": {
+            "ci_hi": 0.6123805136162047,
+            "ci_lo": 0.5956936430168324,
+            "point": 0.6011107584893685
+          }
+        }
+      },
+      {
+        "cpu": {
+          "new": {
+            "mad_ns": 7000.0,
+            "max_ns": 133000.0,
+            "median_ns": 109500.0,
+            "min_ns": 83000.0,
+            "n": 20
+          },
+          "old": {
+            "mad_ns": 14500.0,
+            "max_ns": 139000.0,
+            "median_ns": 112500.0,
+            "min_ns": 88000.0,
+            "n": 20
+          },
+          "ratio": {
+            "ci_hi": 1.0952380952380953,
+            "ci_lo": 0.8803418803418803,
+            "point": 0.9733333333333334
+          }
+        },
+        "name": "real photo aa222fee9505 native 1456x1754",
+        "wall": {
+          "new": {
+            "mad_ns": 7667.0,
+            "max_ns": 1187167.0,
+            "median_ns": 1157083.5,
+            "min_ns": 1114917.0,
+            "n": 20
+          },
+          "old": {
+            "mad_ns": 16354.5,
+            "max_ns": 1874917.0,
+            "median_ns": 1842083.0,
+            "min_ns": 1802250.0,
+            "n": 20
+          },
+          "ratio": {
+            "ci_hi": 0.6330874519666287,
+            "ci_lo": 0.6229645049984537,
+            "point": 0.6281386343612095
+          }
+        }
+      },
+      {
+        "cpu": {
+          "new": {
+            "mad_ns": 23500.0,
+            "max_ns": 337000.0,
+            "median_ns": 116000.0,
+            "min_ns": 69000.0,
+            "n": 20
+          },
+          "old": {
+            "mad_ns": 9000.0,
+            "max_ns": 135000.0,
+            "median_ns": 114000.0,
+            "min_ns": 75000.0,
+            "n": 20
+          },
+          "ratio": {
+            "ci_hi": 1.1857142857142857,
+            "ci_lo": 0.8138528138528138,
+            "point": 1.0175438596491229
+          }
+        },
+        "name": "real photo c4e745c1d791 native 1060x1444",
+        "wall": {
+          "new": {
+            "mad_ns": 25375.5,
+            "max_ns": 1057917.0,
+            "median_ns": 868291.5,
+            "min_ns": 781500.0,
+            "n": 20
+          },
+          "old": {
+            "mad_ns": 12166.5,
+            "max_ns": 1277583.0,
+            "median_ns": 1203354.5,
+            "min_ns": 1143125.0,
+            "n": 20
+          },
+          "ratio": {
+            "ci_hi": 0.7309262166405024,
+            "ci_lo": 0.6856352868604775,
+            "point": 0.721559191410345
+          }
+        }
+      }
+    ],
+    "name": "lightcraft GPU box r=32 on Apple M6 (Metal)",
+    "publishable": true,
+    "revs": {
+      "new": "63b2f24add7ab02ae52078d3be5257e1ff0ce12a",
+      "old": "06c1b9ae0775464ce83ef0a9588be770337600f1"
+    },
+    "runs": [
+      {
+        "cpu_ns": 138000,
+        "input": "real photo 09a31661b076 native 2048x1365",
+        "order": 0,
+        "side": "new",
+        "wall_ns": 1209042
+      },
+      {
+        "cpu_ns": 114000,
+        "input": "real photo 09a31661b076 native 2048x1365",
+        "order": 1,
+        "side": "old",
+        "wall_ns": 1974041
+      },
+      {
+        "cpu_ns": 101000,
+        "input": "real photo 09a31661b076 native 2048x1365",
+        "order": 2,
+        "side": "old",
+        "wall_ns": 1975125
+      },
+      {
+        "cpu_ns": 104000,
+        "input": "real photo 09a31661b076 native 2048x1365",
+        "order": 3,
+        "side": "new",
+        "wall_ns": 1180916
+      },
+      {
+        "cpu_ns": 116000,
+        "input": "real photo aa222fee9505 native 1456x1754",
+        "order": 4,
+        "side": "old",
+        "wall_ns": 1843583
+      },
+      {
+        "cpu_ns": 111000,
+        "input": "real photo aa222fee9505 native 1456x1754",
+        "order": 5,
+        "side": "new",
+        "wall_ns": 1157500
+      },
+      {
+        "cpu_ns": 108000,
+        "input": "real photo aa222fee9505 native 1456x1754",
+        "order": 6,
+        "side": "new",
+        "wall_ns": 1147542
+      },
+      {
+        "cpu_ns": 94000,
+        "input": "real photo aa222fee9505 native 1456x1754",
+        "order": 7,
+        "side": "old",
+        "wall_ns": 1817125
+      },
+      {
+        "cpu_ns": 75000,
+        "input": "real photo c4e745c1d791 native 1060x1444",
+        "order": 8,
+        "side": "old",
+        "wall_ns": 1143125
+      },
+      {
+        "cpu_ns": 69000,
+        "input": "real photo c4e745c1d791 native 1060x1444",
+        "order": 9,
+        "side": "new",
+        "wall_ns": 781500
+      },
+      {
+        "cpu_ns": 94000,
+        "input": "real photo c4e745c1d791 native 1060x1444",
+        "order": 10,
+        "side": "new",
+        "wall_ns": 809250
+      },
+      {
+        "cpu_ns": 103000,
+        "input": "real photo c4e745c1d791 native 1060x1444",
+        "order": 11,
+        "side": "old",
+        "wall_ns": 1194375
+      },
+      {
+        "cpu_ns": 105000,
+        "input": "real photo 09a31661b076 native 2048x1365",
+        "order": 12,
+        "side": "old",
+        "wall_ns": 1958875
+      },
+      {
+        "cpu_ns": 108000,
+        "input": "real photo 09a31661b076 native 2048x1365",
+        "order": 13,
+        "side": "new",
+        "wall_ns": 1181375
+      },
+      {
+        "cpu_ns": 99000,
+        "input": "real photo 09a31661b076 native 2048x1365",
+        "order": 14,
+        "side": "new",
+        "wall_ns": 1169875
+      },
+      {
+        "cpu_ns": 83000,
+        "input": "real photo 09a31661b076 native 2048x1365",
+        "order": 15,
+        "side": "old",
+        "wall_ns": 1941667
+      },
+      {
+        "cpu_ns": 131000,
+        "input": "synthetic 6000x4000",
+        "order": 16,
+        "side": "old",
+        "wall_ns": 15495834
+      },
+      {
+        "cpu_ns": 186000,
+        "input": "synthetic 6000x4000",
+        "order": 17,
+        "side": "new",
+        "wall_ns": 8853917
+      },
+      {
+        "cpu_ns": 153000,
+        "input": "synthetic 6000x4000",
+        "order": 18,
+        "side": "new",
+        "wall_ns": 8767083
+      },
+      {
+        "cpu_ns": 138000,
+        "input": "synthetic 6000x4000",
+        "order": 19,
+        "side": "old",
+        "wall_ns": 15319500
+      },
+      {
+        "cpu_ns": 139000,
+        "input": "real photo aa222fee9505 native 1456x1754",
+        "order": 20,
+        "side": "old",
+        "wall_ns": 1874917
+      },
+      {
+        "cpu_ns": 121000,
+        "input": "real photo aa222fee9505 native 1456x1754",
+        "order": 21,
+        "side": "new",
+        "wall_ns": 1154791
+      },
+      {
+        "cpu_ns": 103000,
+        "input": "real photo aa222fee9505 native 1456x1754",
+        "order": 22,
+        "side": "new",
+        "wall_ns": 1155958
+      },
+      {
+        "cpu_ns": 130000,
+        "input": "real photo aa222fee9505 native 1456x1754",
+        "order": 23,
+        "side": "old",
+        "wall_ns": 1872166
+      },
+      {
+        "cpu_ns": 116000,
+        "input": "real photo aa222fee9505 native 1456x1754",
+        "order": 24,
+        "side": "new",
+        "wall_ns": 1156667
+      },
+      {
+        "cpu_ns": 112000,
+        "input": "real photo aa222fee9505 native 1456x1754",
+        "order": 25,
+        "side": "old",
+        "wall_ns": 1855208
+      },
+      {
+        "cpu_ns": 123000,
+        "input": "real photo aa222fee9505 native 1456x1754",
+        "order": 26,
+        "side": "old",
+        "wall_ns": 1844792
+      },
+      {
+        "cpu_ns": 89000,
+        "input": "real photo aa222fee9505 native 1456x1754",
+        "order": 27,
+        "side": "new",
+        "wall_ns": 1135208
+      },
+      {
+        "cpu_ns": 96000,
+        "input": "real photo 09a31661b076 native 2048x1365",
+        "order": 28,
+        "side": "old",
+        "wall_ns": 1956916
+      },
+      {
+        "cpu_ns": 89000,
+        "input": "real photo 09a31661b076 native 2048x1365",
+        "order": 29,
+        "side": "new",
+        "wall_ns": 1159417
+      },
+      {
+        "cpu_ns": 99000,
+        "input": "real photo 09a31661b076 native 2048x1365",
+        "order": 30,
+        "side": "new",
+        "wall_ns": 1210334
+      },
+      {
+        "cpu_ns": 145000,
+        "input": "real photo 09a31661b076 native 2048x1365",
+        "order": 31,
+        "side": "old",
+        "wall_ns": 2012666
+      },
+      {
+        "cpu_ns": 118000,
+        "input": "real photo c4e745c1d791 native 1060x1444",
+        "order": 32,
+        "side": "old",
+        "wall_ns": 1208125
+      },
+      {
+        "cpu_ns": 93000,
+        "input": "real photo c4e745c1d791 native 1060x1444",
+        "order": 33,
+        "side": "new",
+        "wall_ns": 839708
+      },
+      {
+        "cpu_ns": 98000,
+        "input": "real photo c4e745c1d791 native 1060x1444",
+        "order": 34,
+        "side": "new",
+        "wall_ns": 828792
+      },
+      {
+        "cpu_ns": 105000,
+        "input": "real photo c4e745c1d791 native 1060x1444",
+        "order": 35,
+        "side": "old",
+        "wall_ns": 1202667
+      },
+      {
+        "cpu_ns": 124000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 36,
+        "side": "new",
+        "wall_ns": 8769333
+      },
+      {
+        "cpu_ns": 103000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 37,
+        "side": "old",
+        "wall_ns": 15299084
+      },
+      {
+        "cpu_ns": 116000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 38,
+        "side": "old",
+        "wall_ns": 15294708
+      },
+      {
+        "cpu_ns": 129000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 39,
+        "side": "new",
+        "wall_ns": 8745792
+      },
+      {
+        "cpu_ns": 129000,
+        "input": "synthetic 6000x4000",
+        "order": 40,
+        "side": "new",
+        "wall_ns": 8744917
+      },
+      {
+        "cpu_ns": 130000,
+        "input": "synthetic 6000x4000",
+        "order": 41,
+        "side": "old",
+        "wall_ns": 15300708
+      },
+      {
+        "cpu_ns": 144000,
+        "input": "synthetic 6000x4000",
+        "order": 42,
+        "side": "old",
+        "wall_ns": 15349000
+      },
+      {
+        "cpu_ns": 120000,
+        "input": "synthetic 6000x4000",
+        "order": 43,
+        "side": "new",
+        "wall_ns": 8722666
+      },
+      {
+        "cpu_ns": 115000,
+        "input": "real photo c4e745c1d791 native 1060x1444",
+        "order": 44,
+        "side": "old",
+        "wall_ns": 1191000
+      },
+      {
+        "cpu_ns": 90000,
+        "input": "real photo c4e745c1d791 native 1060x1444",
+        "order": 45,
+        "side": "new",
+        "wall_ns": 815000
+      },
+      {
+        "cpu_ns": 79000,
+        "input": "real photo c4e745c1d791 native 1060x1444",
+        "order": 46,
+        "side": "new",
+        "wall_ns": 796083
+      },
+      {
+        "cpu_ns": 81000,
+        "input": "real photo c4e745c1d791 native 1060x1444",
+        "order": 47,
+        "side": "old",
+        "wall_ns": 1159375
+      },
+      {
+        "cpu_ns": 103000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 48,
+        "side": "old",
+        "wall_ns": 15290208
+      },
+      {
+        "cpu_ns": 113000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 49,
+        "side": "new",
+        "wall_ns": 8757584
+      },
+      {
+        "cpu_ns": 92000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 50,
+        "side": "new",
+        "wall_ns": 8726583
+      },
+      {
+        "cpu_ns": 109000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 51,
+        "side": "old",
+        "wall_ns": 15311000
+      },
+      {
+        "cpu_ns": 141000,
+        "input": "synthetic 6000x4000",
+        "order": 52,
+        "side": "new",
+        "wall_ns": 8788667
+      },
+      {
+        "cpu_ns": 158000,
+        "input": "synthetic 6000x4000",
+        "order": 53,
+        "side": "old",
+        "wall_ns": 15347042
+      },
+      {
+        "cpu_ns": 178000,
+        "input": "synthetic 6000x4000",
+        "order": 54,
+        "side": "old",
+        "wall_ns": 15382500
+      },
+      {
+        "cpu_ns": 366000,
+        "input": "synthetic 6000x4000",
+        "order": 55,
+        "side": "new",
+        "wall_ns": 9021916
+      },
+      {
+        "cpu_ns": 337000,
+        "input": "real photo c4e745c1d791 native 1060x1444",
+        "order": 56,
+        "side": "new",
+        "wall_ns": 1057917
+      },
+      {
+        "cpu_ns": 123000,
+        "input": "real photo c4e745c1d791 native 1060x1444",
+        "order": 57,
+        "side": "old",
+        "wall_ns": 1204042
+      },
+      {
+        "cpu_ns": 100000,
+        "input": "real photo c4e745c1d791 native 1060x1444",
+        "order": 58,
+        "side": "old",
+        "wall_ns": 1191000
+      },
+      {
+        "cpu_ns": 121000,
+        "input": "real photo c4e745c1d791 native 1060x1444",
+        "order": 59,
+        "side": "new",
+        "wall_ns": 870208
+      },
+      {
+        "cpu_ns": 155000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 60,
+        "side": "old",
+        "wall_ns": 15327041
+      },
+      {
+        "cpu_ns": 153000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 61,
+        "side": "new",
+        "wall_ns": 8793292
+      },
+      {
+        "cpu_ns": 128000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 62,
+        "side": "new",
+        "wall_ns": 8730583
+      },
+      {
+        "cpu_ns": 111000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 63,
+        "side": "old",
+        "wall_ns": 15285166
+      },
+      {
+        "cpu_ns": 160000,
+        "input": "real photo c4e745c1d791 native 1060x1444",
+        "order": 64,
+        "side": "new",
+        "wall_ns": 923709
+      },
+      {
+        "cpu_ns": 112000,
+        "input": "real photo c4e745c1d791 native 1060x1444",
+        "order": 65,
+        "side": "old",
+        "wall_ns": 1202583
+      },
+      {
+        "cpu_ns": 83000,
+        "input": "real photo c4e745c1d791 native 1060x1444",
+        "order": 66,
+        "side": "old",
+        "wall_ns": 1178625
+      },
+      {
+        "cpu_ns": 85000,
+        "input": "real photo c4e745c1d791 native 1060x1444",
+        "order": 67,
+        "side": "new",
+        "wall_ns": 806333
+      },
+      {
+        "cpu_ns": 104000,
+        "input": "synthetic 6000x4000",
+        "order": 68,
+        "side": "new",
+        "wall_ns": 8705917
+      },
+      {
+        "cpu_ns": 129000,
+        "input": "synthetic 6000x4000",
+        "order": 69,
+        "side": "old",
+        "wall_ns": 15295583
+      },
+      {
+        "cpu_ns": 131000,
+        "input": "synthetic 6000x4000",
+        "order": 70,
+        "side": "old",
+        "wall_ns": 15324917
+      },
+      {
+        "cpu_ns": 132000,
+        "input": "synthetic 6000x4000",
+        "order": 71,
+        "side": "new",
+        "wall_ns": 8769417
+      },
+      {
+        "cpu_ns": 104000,
+        "input": "synthetic 6000x4000",
+        "order": 72,
+        "side": "new",
+        "wall_ns": 8711125
+      },
+      {
+        "cpu_ns": 126000,
+        "input": "synthetic 6000x4000",
+        "order": 73,
+        "side": "old",
+        "wall_ns": 15326500
+      },
+      {
+        "cpu_ns": 142000,
+        "input": "synthetic 6000x4000",
+        "order": 74,
+        "side": "old",
+        "wall_ns": 15365125
+      },
+      {
+        "cpu_ns": 146000,
+        "input": "synthetic 6000x4000",
+        "order": 75,
+        "side": "new",
+        "wall_ns": 8820750
+      },
+      {
+        "cpu_ns": 125000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 76,
+        "side": "old",
+        "wall_ns": 15311625
+      },
+      {
+        "cpu_ns": 142000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 77,
+        "side": "new",
+        "wall_ns": 8803209
+      },
+      {
+        "cpu_ns": 129000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 78,
+        "side": "new",
+        "wall_ns": 8753041
+      },
+      {
+        "cpu_ns": 123000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 79,
+        "side": "old",
+        "wall_ns": 15313041
+      },
+      {
+        "cpu_ns": 135000,
+        "input": "synthetic 6000x4000",
+        "order": 80,
+        "side": "new",
+        "wall_ns": 8804541
+      },
+      {
+        "cpu_ns": 116000,
+        "input": "synthetic 6000x4000",
+        "order": 81,
+        "side": "old",
+        "wall_ns": 15298292
+      },
+      {
+        "cpu_ns": 164000,
+        "input": "synthetic 6000x4000",
+        "order": 82,
+        "side": "old",
+        "wall_ns": 15435458
+      },
+      {
+        "cpu_ns": 129000,
+        "input": "synthetic 6000x4000",
+        "order": 83,
+        "side": "new",
+        "wall_ns": 8746333
+      },
+      {
+        "cpu_ns": 113000,
+        "input": "real photo 09a31661b076 native 2048x1365",
+        "order": 84,
+        "side": "old",
+        "wall_ns": 1979333
+      },
+      {
+        "cpu_ns": 91000,
+        "input": "real photo 09a31661b076 native 2048x1365",
+        "order": 85,
+        "side": "new",
+        "wall_ns": 1163250
+      },
+      {
+        "cpu_ns": 95000,
+        "input": "real photo 09a31661b076 native 2048x1365",
+        "order": 86,
+        "side": "new",
+        "wall_ns": 1147291
+      },
+      {
+        "cpu_ns": 103000,
+        "input": "real photo 09a31661b076 native 2048x1365",
+        "order": 87,
+        "side": "old",
+        "wall_ns": 1943625
+      },
+      {
+        "cpu_ns": 141000,
+        "input": "synthetic 6000x4000",
+        "order": 88,
+        "side": "old",
+        "wall_ns": 15354833
+      },
+      {
+        "cpu_ns": 156000,
+        "input": "synthetic 6000x4000",
+        "order": 89,
+        "side": "new",
+        "wall_ns": 8810167
+      },
+      {
+        "cpu_ns": 119000,
+        "input": "synthetic 6000x4000",
+        "order": 90,
+        "side": "new",
+        "wall_ns": 8727083
+      },
+      {
+        "cpu_ns": 136000,
+        "input": "synthetic 6000x4000",
+        "order": 91,
+        "side": "old",
+        "wall_ns": 15288417
+      },
+      {
+        "cpu_ns": 131000,
+        "input": "synthetic 6000x4000",
+        "order": 92,
+        "side": "old",
+        "wall_ns": 15331042
+      },
+      {
+        "cpu_ns": 147000,
+        "input": "synthetic 6000x4000",
+        "order": 93,
+        "side": "new",
+        "wall_ns": 8791083
+      },
+      {
+        "cpu_ns": 127000,
+        "input": "synthetic 6000x4000",
+        "order": 94,
+        "side": "new",
+        "wall_ns": 8738417
+      },
+      {
+        "cpu_ns": 105000,
+        "input": "synthetic 6000x4000",
+        "order": 95,
+        "side": "old",
+        "wall_ns": 15278708
+      },
+      {
+        "cpu_ns": 130000,
+        "input": "synthetic 6000x4000",
+        "order": 96,
+        "side": "new",
+        "wall_ns": 8787083
+      },
+      {
+        "cpu_ns": 125000,
+        "input": "synthetic 6000x4000",
+        "order": 97,
+        "side": "old",
+        "wall_ns": 15298708
+      },
+      {
+        "cpu_ns": 118000,
+        "input": "synthetic 6000x4000",
+        "order": 98,
+        "side": "old",
+        "wall_ns": 15304833
+      },
+      {
+        "cpu_ns": 120000,
+        "input": "synthetic 6000x4000",
+        "order": 99,
+        "side": "new",
+        "wall_ns": 8749209
+      },
+      {
+        "cpu_ns": 123000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 100,
+        "side": "old",
+        "wall_ns": 15337334
+      },
+      {
+        "cpu_ns": 125000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 101,
+        "side": "new",
+        "wall_ns": 8763375
+      },
+      {
+        "cpu_ns": 125000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 102,
+        "side": "new",
+        "wall_ns": 8735375
+      },
+      {
+        "cpu_ns": 126000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 103,
+        "side": "old",
+        "wall_ns": 15291625
+      },
+      {
+        "cpu_ns": 136000,
+        "input": "real photo aa222fee9505 native 1456x1754",
+        "order": 104,
+        "side": "old",
+        "wall_ns": 1873667
+      },
+      {
+        "cpu_ns": 97000,
+        "input": "real photo aa222fee9505 native 1456x1754",
+        "order": 105,
+        "side": "new",
+        "wall_ns": 1150833
+      },
+      {
+        "cpu_ns": 100000,
+        "input": "real photo aa222fee9505 native 1456x1754",
+        "order": 106,
+        "side": "new",
+        "wall_ns": 1160458
+      },
+      {
+        "cpu_ns": 97000,
+        "input": "real photo aa222fee9505 native 1456x1754",
+        "order": 107,
+        "side": "old",
+        "wall_ns": 1819042
+      },
+      {
+        "cpu_ns": 105000,
+        "input": "real photo aa222fee9505 native 1456x1754",
+        "order": 108,
+        "side": "old",
+        "wall_ns": 1850208
+      },
+      {
+        "cpu_ns": 115000,
+        "input": "real photo aa222fee9505 native 1456x1754",
+        "order": 109,
+        "side": "new",
+        "wall_ns": 1158500
+      },
+      {
+        "cpu_ns": 117000,
+        "input": "real photo aa222fee9505 native 1456x1754",
+        "order": 110,
+        "side": "new",
+        "wall_ns": 1159333
+      },
+      {
+        "cpu_ns": 111000,
+        "input": "real photo aa222fee9505 native 1456x1754",
+        "order": 111,
+        "side": "old",
+        "wall_ns": 1838250
+      },
+      {
+        "cpu_ns": 95000,
+        "input": "real photo 09a31661b076 native 2048x1365",
+        "order": 112,
+        "side": "old",
+        "wall_ns": 1966250
+      },
+      {
+        "cpu_ns": 111000,
+        "input": "real photo 09a31661b076 native 2048x1365",
+        "order": 113,
+        "side": "new",
+        "wall_ns": 1161625
+      },
+      {
+        "cpu_ns": 119000,
+        "input": "real photo 09a31661b076 native 2048x1365",
+        "order": 114,
+        "side": "new",
+        "wall_ns": 1200834
+      },
+      {
+        "cpu_ns": 137000,
+        "input": "real photo 09a31661b076 native 2048x1365",
+        "order": 115,
+        "side": "old",
+        "wall_ns": 2004791
+      },
+      {
+        "cpu_ns": 121000,
+        "input": "real photo c4e745c1d791 native 1060x1444",
+        "order": 116,
+        "side": "new",
+        "wall_ns": 873208
+      },
+      {
+        "cpu_ns": 118000,
+        "input": "real photo c4e745c1d791 native 1060x1444",
+        "order": 117,
+        "side": "old",
+        "wall_ns": 1215792
+      },
+      {
+        "cpu_ns": 123000,
+        "input": "real photo c4e745c1d791 native 1060x1444",
+        "order": 118,
+        "side": "old",
+        "wall_ns": 1217500
+      },
+      {
+        "cpu_ns": 101000,
+        "input": "real photo c4e745c1d791 native 1060x1444",
+        "order": 119,
+        "side": "new",
+        "wall_ns": 875083
+      },
+      {
+        "cpu_ns": 82000,
+        "input": "real photo c4e745c1d791 native 1060x1444",
+        "order": 120,
+        "side": "new",
+        "wall_ns": 823542
+      },
+      {
+        "cpu_ns": 102000,
+        "input": "real photo c4e745c1d791 native 1060x1444",
+        "order": 121,
+        "side": "old",
+        "wall_ns": 1179833
+      },
+      {
+        "cpu_ns": 113000,
+        "input": "real photo c4e745c1d791 native 1060x1444",
+        "order": 122,
+        "side": "old",
+        "wall_ns": 1210416
+      },
+      {
+        "cpu_ns": 128000,
+        "input": "real photo c4e745c1d791 native 1060x1444",
+        "order": 123,
+        "side": "new",
+        "wall_ns": 873000
+      },
+      {
+        "cpu_ns": 133000,
+        "input": "real photo aa222fee9505 native 1456x1754",
+        "order": 124,
+        "side": "old",
+        "wall_ns": 1857250
+      },
+      {
+        "cpu_ns": 118000,
+        "input": "real photo aa222fee9505 native 1456x1754",
+        "order": 125,
+        "side": "new",
+        "wall_ns": 1168917
+      },
+      {
+        "cpu_ns": 112000,
+        "input": "real photo aa222fee9505 native 1456x1754",
+        "order": 126,
+        "side": "new",
+        "wall_ns": 1163000
+      },
+      {
+        "cpu_ns": 116000,
+        "input": "real photo aa222fee9505 native 1456x1754",
+        "order": 127,
+        "side": "old",
+        "wall_ns": 1846208
+      },
+      {
+        "cpu_ns": 102000,
+        "input": "real photo 09a31661b076 native 2048x1365",
+        "order": 128,
+        "side": "new",
+        "wall_ns": 1230208
+      },
+      {
+        "cpu_ns": 103000,
+        "input": "real photo 09a31661b076 native 2048x1365",
+        "order": 129,
+        "side": "old",
+        "wall_ns": 1968875
+      },
+      {
+        "cpu_ns": 114000,
+        "input": "real photo 09a31661b076 native 2048x1365",
+        "order": 130,
+        "side": "old",
+        "wall_ns": 1988709
+      },
+      {
+        "cpu_ns": 114000,
+        "input": "real photo 09a31661b076 native 2048x1365",
+        "order": 131,
+        "side": "new",
+        "wall_ns": 1197084
+      },
+      {
+        "cpu_ns": 119000,
+        "input": "real photo c4e745c1d791 native 1060x1444",
+        "order": 132,
+        "side": "old",
+        "wall_ns": 1212041
+      },
+      {
+        "cpu_ns": 123000,
+        "input": "real photo c4e745c1d791 native 1060x1444",
+        "order": 133,
+        "side": "new",
+        "wall_ns": 866375
+      },
+      {
+        "cpu_ns": 136000,
+        "input": "real photo c4e745c1d791 native 1060x1444",
+        "order": 134,
+        "side": "new",
+        "wall_ns": 877750
+      },
+      {
+        "cpu_ns": 112000,
+        "input": "real photo c4e745c1d791 native 1060x1444",
+        "order": 135,
+        "side": "old",
+        "wall_ns": 1208708
+      },
+      {
+        "cpu_ns": 113000,
+        "input": "real photo aa222fee9505 native 1456x1754",
+        "order": 136,
+        "side": "old",
+        "wall_ns": 1840583
+      },
+      {
+        "cpu_ns": 115000,
+        "input": "real photo aa222fee9505 native 1456x1754",
+        "order": 137,
+        "side": "new",
+        "wall_ns": 1170541
+      },
+      {
+        "cpu_ns": 133000,
+        "input": "real photo aa222fee9505 native 1456x1754",
+        "order": 138,
+        "side": "new",
+        "wall_ns": 1187167
+      },
+      {
+        "cpu_ns": 111000,
+        "input": "real photo aa222fee9505 native 1456x1754",
+        "order": 139,
+        "side": "old",
+        "wall_ns": 1839875
+      },
+      {
+        "cpu_ns": 110000,
+        "input": "synthetic 6000x4000",
+        "order": 140,
+        "side": "old",
+        "wall_ns": 15315542
+      },
+      {
+        "cpu_ns": 189000,
+        "input": "synthetic 6000x4000",
+        "order": 141,
+        "side": "new",
+        "wall_ns": 8798875
+      },
+      {
+        "cpu_ns": 121000,
+        "input": "synthetic 6000x4000",
+        "order": 142,
+        "side": "new",
+        "wall_ns": 9565917
+      },
+      {
+        "cpu_ns": 118000,
+        "input": "synthetic 6000x4000",
+        "order": 143,
+        "side": "old",
+        "wall_ns": 15315500
+      },
+      {
+        "cpu_ns": 120000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 144,
+        "side": "old",
+        "wall_ns": 15364542
+      },
+      {
+        "cpu_ns": 112000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 145,
+        "side": "new",
+        "wall_ns": 8715834
+      },
+      {
+        "cpu_ns": 113000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 146,
+        "side": "new",
+        "wall_ns": 8723042
+      },
+      {
+        "cpu_ns": 121000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 147,
+        "side": "old",
+        "wall_ns": 15295542
+      },
+      {
+        "cpu_ns": 117000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 148,
+        "side": "new",
+        "wall_ns": 8775666
+      },
+      {
+        "cpu_ns": 114000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 149,
+        "side": "old",
+        "wall_ns": 15303708
+      },
+      {
+        "cpu_ns": 143000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 150,
+        "side": "old",
+        "wall_ns": 15354917
+      },
+      {
+        "cpu_ns": 120000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 151,
+        "side": "new",
+        "wall_ns": 8745000
+      },
+      {
+        "cpu_ns": 102000,
+        "input": "real photo 09a31661b076 native 2048x1365",
+        "order": 152,
+        "side": "old",
+        "wall_ns": 1958542
+      },
+      {
+        "cpu_ns": 108000,
+        "input": "real photo 09a31661b076 native 2048x1365",
+        "order": 153,
+        "side": "new",
+        "wall_ns": 1184834
+      },
+      {
+        "cpu_ns": 139000,
+        "input": "real photo 09a31661b076 native 2048x1365",
+        "order": 154,
+        "side": "new",
+        "wall_ns": 1220750
+      },
+      {
+        "cpu_ns": 96000,
+        "input": "real photo 09a31661b076 native 2048x1365",
+        "order": 155,
+        "side": "old",
+        "wall_ns": 1953042
+      },
+      {
+        "cpu_ns": 98000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 156,
+        "side": "new",
+        "wall_ns": 8736208
+      },
+      {
+        "cpu_ns": 103000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 157,
+        "side": "old",
+        "wall_ns": 15266500
+      },
+      {
+        "cpu_ns": 118000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 158,
+        "side": "old",
+        "wall_ns": 15336709
+      },
+      {
+        "cpu_ns": 114000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 159,
+        "side": "new",
+        "wall_ns": 8748625
+      },
+      {
+        "cpu_ns": 117000,
+        "input": "real photo aa222fee9505 native 1456x1754",
+        "order": 160,
+        "side": "new",
+        "wall_ns": 1158792
+      },
+      {
+        "cpu_ns": 126000,
+        "input": "real photo aa222fee9505 native 1456x1754",
+        "order": 161,
+        "side": "old",
+        "wall_ns": 1859625
+      },
+      {
+        "cpu_ns": 91000,
+        "input": "real photo aa222fee9505 native 1456x1754",
+        "order": 162,
+        "side": "old",
+        "wall_ns": 1817292
+      },
+      {
+        "cpu_ns": 100000,
+        "input": "real photo aa222fee9505 native 1456x1754",
+        "order": 163,
+        "side": "new",
+        "wall_ns": 1122291
+      },
+      {
+        "cpu_ns": 109000,
+        "input": "real photo 09a31661b076 native 2048x1365",
+        "order": 164,
+        "side": "new",
+        "wall_ns": 1180292
+      },
+      {
+        "cpu_ns": 104000,
+        "input": "real photo 09a31661b076 native 2048x1365",
+        "order": 165,
+        "side": "old",
+        "wall_ns": 1944125
+      },
+      {
+        "cpu_ns": 105000,
+        "input": "real photo 09a31661b076 native 2048x1365",
+        "order": 166,
+        "side": "old",
+        "wall_ns": 1974625
+      },
+      {
+        "cpu_ns": 107000,
+        "input": "real photo 09a31661b076 native 2048x1365",
+        "order": 167,
+        "side": "new",
+        "wall_ns": 1182791
+      },
+      {
+        "cpu_ns": 102000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 168,
+        "side": "new",
+        "wall_ns": 8717083
+      },
+      {
+        "cpu_ns": 123000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 169,
+        "side": "old",
+        "wall_ns": 15308333
+      },
+      {
+        "cpu_ns": 169000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 170,
+        "side": "old",
+        "wall_ns": 15379917
+      },
+      {
+        "cpu_ns": 182000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 171,
+        "side": "new",
+        "wall_ns": 8803791
+      },
+      {
+        "cpu_ns": 116000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 172,
+        "side": "new",
+        "wall_ns": 8741125
+      },
+      {
+        "cpu_ns": 127000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 173,
+        "side": "old",
+        "wall_ns": 15283000
+      },
+      {
+        "cpu_ns": 155000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 174,
+        "side": "old",
+        "wall_ns": 15369500
+      },
+      {
+        "cpu_ns": 155000,
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "order": 175,
+        "side": "new",
+        "wall_ns": 8814417
+      },
+      {
+        "cpu_ns": 143000,
+        "input": "real photo c4e745c1d791 native 1060x1444",
+        "order": 176,
+        "side": "new",
+        "wall_ns": 890459
+      },
+      {
+        "cpu_ns": 126000,
+        "input": "real photo c4e745c1d791 native 1060x1444",
+        "order": 177,
+        "side": "old",
+        "wall_ns": 1215333
+      },
+      {
+        "cpu_ns": 124000,
+        "input": "real photo c4e745c1d791 native 1060x1444",
+        "order": 178,
+        "side": "old",
+        "wall_ns": 1216500
+      },
+      {
+        "cpu_ns": 140000,
+        "input": "real photo c4e745c1d791 native 1060x1444",
+        "order": 179,
+        "side": "new",
+        "wall_ns": 876208
+      },
+      {
+        "cpu_ns": 142000,
+        "input": "real photo c4e745c1d791 native 1060x1444",
+        "order": 180,
+        "side": "new",
+        "wall_ns": 882792
+      },
+      {
+        "cpu_ns": 116000,
+        "input": "real photo c4e745c1d791 native 1060x1444",
+        "order": 181,
+        "side": "old",
+        "wall_ns": 1201125
+      },
+      {
+        "cpu_ns": 135000,
+        "input": "real photo c4e745c1d791 native 1060x1444",
+        "order": 182,
+        "side": "old",
+        "wall_ns": 1277583
+      },
+      {
+        "cpu_ns": 111000,
+        "input": "real photo c4e745c1d791 native 1060x1444",
+        "order": 183,
+        "side": "new",
+        "wall_ns": 865500
+      },
+      {
+        "cpu_ns": 122000,
+        "input": "real photo 09a31661b076 native 2048x1365",
+        "order": 184,
+        "side": "old",
+        "wall_ns": 1973334
+      },
+      {
+        "cpu_ns": 128000,
+        "input": "real photo 09a31661b076 native 2048x1365",
+        "order": 185,
+        "side": "new",
+        "wall_ns": 1211125
+      },
+      {
+        "cpu_ns": 122000,
+        "input": "real photo 09a31661b076 native 2048x1365",
+        "order": 186,
+        "side": "new",
+        "wall_ns": 1195667
+      },
+      {
+        "cpu_ns": 145000,
+        "input": "real photo 09a31661b076 native 2048x1365",
+        "order": 187,
+        "side": "old",
+        "wall_ns": 2005208
+      },
+      {
+        "cpu_ns": 103000,
+        "input": "real photo aa222fee9505 native 1456x1754",
+        "order": 188,
+        "side": "new",
+        "wall_ns": 1145375
+      },
+      {
+        "cpu_ns": 97000,
+        "input": "real photo aa222fee9505 native 1456x1754",
+        "order": 189,
+        "side": "old",
+        "wall_ns": 1812750
+      },
+      {
+        "cpu_ns": 118000,
+        "input": "real photo aa222fee9505 native 1456x1754",
+        "order": 190,
+        "side": "old",
+        "wall_ns": 1834209
+      },
+      {
+        "cpu_ns": 108000,
+        "input": "real photo aa222fee9505 native 1456x1754",
+        "order": 191,
+        "side": "new",
+        "wall_ns": 1172416
+      },
+      {
+        "cpu_ns": 93000,
+        "input": "real photo 09a31661b076 native 2048x1365",
+        "order": 192,
+        "side": "new",
+        "wall_ns": 1162584
+      },
+      {
+        "cpu_ns": 110000,
+        "input": "real photo 09a31661b076 native 2048x1365",
+        "order": 193,
+        "side": "old",
+        "wall_ns": 1963875
+      },
+      {
+        "cpu_ns": 115000,
+        "input": "real photo 09a31661b076 native 2048x1365",
+        "order": 194,
+        "side": "old",
+        "wall_ns": 1969875
+      },
+      {
+        "cpu_ns": 125000,
+        "input": "real photo 09a31661b076 native 2048x1365",
+        "order": 195,
+        "side": "new",
+        "wall_ns": 1229125
+      },
+      {
+        "cpu_ns": 103000,
+        "input": "real photo aa222fee9505 native 1456x1754",
+        "order": 196,
+        "side": "new",
+        "wall_ns": 1148000
+      },
+      {
+        "cpu_ns": 88000,
+        "input": "real photo aa222fee9505 native 1456x1754",
+        "order": 197,
+        "side": "old",
+        "wall_ns": 1802250
+      },
+      {
+        "cpu_ns": 88000,
+        "input": "real photo aa222fee9505 native 1456x1754",
+        "order": 198,
+        "side": "old",
+        "wall_ns": 1821166
+      },
+      {
+        "cpu_ns": 83000,
+        "input": "real photo aa222fee9505 native 1456x1754",
+        "order": 199,
+        "side": "new",
+        "wall_ns": 1114917
+      }
+    ],
+    "schema_version": 1
+  },
+  "label": "C07-gpu-box-h-r32",
+  "meta": {
+    "claim": "C07 GPU box blur r=128 6.8x (horizontal pass, 6000x4000, 1 channel, 59.4 ms -> 8.8 ms)",
+    "equality": "max abs diff <= 1e-4 (documented CPU parity error 1.2e-5)",
+    "equality_checked": "out-of-band by readback before timing (craft-bench check closure is a no-op for () outputs)",
+    "excluded": [],
+    "gpu": {
+      "adapter": "Apple M6",
+      "backend": "Metal",
+      "device_type": "IntegratedGpu",
+      "driver": "",
+      "driver_info": ""
+    },
+    "max_diff_over_inputs": 1.8477439880371094e-6,
+    "radius": 32,
+    "timed_region": "encode + submit + wait for completion; buffers preallocated; parameters buffer created per dispatch like Gpu::run",
+    "vendored": "shaders and dispatch rules: see src/gpu.rs header"
+  },
+  "summary": {
+    "ci_excludes_1": true,
+    "contended": false,
+    "cpu_speedup_geomean": {
+      "ci_hi": 1.0620137121962707,
+      "ci_lo": 0.9501508960970404,
+      "point": 0.996300072205049
+    },
+    "direction": "faster",
+    "inputs": 5,
+    "load_after": 3.2,
+    "load_before": 3.39,
+    "logical_cores": 12,
+    "per_input": [
+      {
+        "cpu_speedup": {
+          "ci_hi": 1.0826446280991735,
+          "ci_lo": 0.8838867908368312,
+          "point": 1.0
+        },
+        "input": "synthetic 6000x4000",
+        "wall_speedup": {
+          "ci_hi": 1.752595839518601,
+          "ci_lo": 1.740062383346505,
+          "point": 1.745474154871415
+        }
+      },
+      {
+        "cpu_speedup": {
+          "ci_hi": 1.0837004405286343,
+          "ci_lo": 0.9236947791164659,
+          "point": 1.0
+        },
+        "input": "real-photo mosaic 6000x4000 (52 JPEGs)",
+        "wall_speedup": {
+          "ci_hi": 1.7532872444577534,
+          "ci_lo": 1.7457803038604585,
+          "point": 1.7502345462555282
+        }
+      },
+      {
+        "cpu_speedup": {
+          "ci_hi": 1.093137254901961,
+          "ci_lo": 0.9012875536480687,
+          "point": 0.9722222222222223
+        },
+        "input": "real photo 09a31661b076 native 2048x1365",
+        "wall_speedup": {
+          "ci_hi": 1.678715245198182,
+          "ci_lo": 1.6329716210185075,
+          "point": 1.66358692782852
+        }
+      },
+      {
+        "cpu_speedup": {
+          "ci_hi": 1.1359223300970873,
+          "ci_lo": 0.9130434782608695,
+          "point": 1.0273972602739725
+        },
+        "input": "real photo aa222fee9505 native 1456x1754",
+        "wall_speedup": {
+          "ci_hi": 1.6052278933652604,
+          "ci_lo": 1.579560607138225,
+          "point": 1.5920052442196264
+        }
+      },
+      {
+        "cpu_speedup": {
+          "ci_hi": 1.2287234042553192,
+          "ci_lo": 0.8433734939759037,
+          "point": 0.9827586206896551
+        },
+        "input": "real photo c4e745c1d791 native 1060x1444",
+        "wall_speedup": {
+          "ci_hi": 1.4585013624065324,
+          "ci_lo": 1.368127147766323,
+          "point": 1.3858876886391265
+        }
+      }
+    ],
+    "publishable": true,
+    "wall_speedup_geomean": {
+      "ci_hi": 1.6385252974018443,
+      "ci_lo": 1.6133953892428414,
+      "point": 1.6216067402650396
+    }
+  }
+}

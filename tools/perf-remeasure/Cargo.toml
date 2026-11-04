@@ -1,0 +1,26 @@
+# Standalone harness (its own workspace): paired OLD-vs-NEW remeasurement for
+# cloudbring/artcraft-algorithms#190 (lightcraft claims C04, C07, C11).
+# OLD = storytold/lightcraft at 06c1b9ae (merge-base of the source branches with origin/main).
+# GPU claims time the kernels directly (the dispatch functions are private in lightcraft-gpu), so the
+# shader sources and dispatch rules are vendored with citations (vendor/, src/gpu.rs).
+# C11 (CPU Gaussian) links OLD by renamed git dep and NEW by path.
+[package]
+name = "perf-remeasure"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[dependencies]
+craft-bench = { git = "https://github.com/cloudbring/craft-libs", rev = "94c6d76e5bc2c936d3db5ce5e19d70213e8390c0" }
+serde_json = "1"
+image = { version = "0.25", default-features = false, features = ["jpeg"] }
+wgpu = { version = "30", default-features = false, features = ["std", "parking_lot", "metal", "wgsl"] }
+pollster = "1"
+bytemuck = "1"
+old-raster = { package = "lightcraft-raster", git = "https://github.com/storytold/lightcraft", rev = "06c1b9ae0775464ce83ef0a9588be770337600f1" }
+new-raster = { package = "lightcraft-raster", path = "../../crates/raster" }
+
+[profile.release]
+debug = "line-tables-only"  # same as the lightcraft workspace release profile
